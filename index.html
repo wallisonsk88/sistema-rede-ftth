@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEGANET FTTX — Projeto de Rede FTTH</title>
+  <meta name="description" content="Ferramenta profissional para projetar redes FTTH.">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css">
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ===================== TOPBAR ===================== -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-icon">📡</div>
+      MEGANET<span>FTTX</span>
+    </div>
+    <div class="topbar-sep"></div>
+    <input class="project-name-input" id="projectName" value="Meu Projeto de Rede" title="Clique para renomear">
+    <div class="topbar-spacer"></div>
+
+    <button class="topbar-btn" onclick="clearAll()" title="Apagar projeto">🗑️ Limpar</button>
+    <button class="topbar-btn" onclick="exportProject()">💾 Salvar</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProject(event)">
+    <button class="topbar-btn" onclick="document.getElementById('importFile').click()">📂 Abrir</button>
+  </header>
+
+  <!-- ===================== WORKSPACE ===================== -->
+  <main class="workspace">
+
+    <!-- TOOLBAR -->
+    <nav class="toolbar" id="toolbar">
+      <button class="tool-btn active" id="tool-select" onclick="setTool('select')" data-tip="Selecionar (S)">
+        <div class="ti">🖱️</div><div class="tl">SEL</div>
+      </button>
+
+      <div class="tool-group-sep"></div>
+
+      <button class="tool-btn" id="tool-pop" onclick="setTool('pop')" data-tip="Colocar POP / OLT (O)">
+        <div class="ti">🏢</div><div class="tl">POP</div>
+      </button>
+
+      <div class="tool-group-sep"></div>
+
+      <button class="tool-btn" id="tool-ruler" onclick="setTool('ruler')" data-tip="Régua (R)">
+        <div class="ti">📏</div><div class="tl">RÉGUA</div>
+      </button>
+
+      <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')" data-tip="Apagar elemento (Del)">
+        <div class="ti">🗑️</div><div class="tl">DEL</div>
+      </button>
+
+      <div class="tool-group-sep"></div>
+
+      <button class="tool-btn" onclick="fitBounds()" data-tip="Ajustar zoom para ver tudo">
+        <div class="ti">⛶</div><div class="tl">FIT</div>
+      </button>
+
+      <button class="tool-btn" id="tool-sat" onclick="toggleSatellite()" data-tip="Mapa / Satélite">
+        <div class="ti">🛰️</div><div class="tl">SAT</div>
+      </button>
+
+      <button class="tool-btn" onclick="map.locate({setView:true,maxZoom:16})" data-tip="Minha localização (GPS)">
+        <div class="ti">📍</div><div class="tl">GPS</div>
+      </button>
+    </nav>
+
+    <!-- MAP -->
+    <section id="map">
+      <div class="hint-overlay" id="hintOverlay"></div>
+    </section>
+
+    <!-- PANEL RIGHT -->
+    <aside class="panel-right">
+      <div class="panel-tabs">
+        <div class="panel-tab active" id="tab-props" onclick="switchTab('props')">Propriedades</div>
+      </div>
+      <div class="panel-body" id="panelBody"></div>
+    </aside>
+
+  </main>
+
+  <!-- STATUS BAR -->
+  <footer class="statusbar">
+    <span>🛠️ Ferramenta: <strong id="sb-tool">Selecionar</strong></span>
+    <span>🏢 POPs: <strong id="sb-pops">0</strong></span>
+  </footer>
+
+  <!-- TOAST -->
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <!-- ===================== SCRIPTS ===================== -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+  <!-- App JS (ordem importa!) -->
+  <script src="js/state.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/optical.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/tools.js"></script>
+  <script src="js/pop.js"></script>
+  <script src="js/ruler.js"></script>
+  <script src="js/panel.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
