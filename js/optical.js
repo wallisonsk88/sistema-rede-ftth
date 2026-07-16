@@ -30,23 +30,21 @@ const SPLITTER_UNBAL = {
   '50/50': { pass: 3.50, drop: 3.50 }
 };
 
-// Atenuação padrão da Fibra Óptica (dB/km) em 1490nm (Download GPON)
-const FIBER_ATTENUATION = 0.25; // 0.25 conforme excel (1490 nm)
+// Atenuação inicial fixa da OLT/POP até o início do ramal (Conexões: 1.0 dB + Emendas: 0.4 dB = 1.4 dB)
+const INITIAL_LOSS = 1.40;
 
-// Perda padrão por conector / fusão (dB)
-const CONNECTOR_LOSS = 0.5; // Conexões = 0.5 conforme excel
+// Perda padrão entre cada caixa CTO na rede desbalanceada (Distância + Fusão = ~0.2525 dB)
+const LOSS_BETWEEN_BOXES = 0.2525;
 
 /**
  * Calcula a potência óptica em cascata de CTOs.
- * @param {number} txPower - Potência de saída da OLT/POP (ex: +4 dBm)
+ * @param {number} txPower - Potência de saída da OLT/POP (ex: +5.0 dBm)
  * @param {Array} ctos - Array com as configurações das CTOs em ordem
  * @returns {Array} Array com a potência de Rx esperada em cada CTO e o sinal que sobra na linha.
  */
 function calculateOpticalCascade(txPower, ctos) {
-  let currentSignal = txPower;
-  
-  // Consideramos uma perda inicial padrão de fusões/conectores no POP (ex: 1.0 dB)
-  currentSignal -= 1.0;
+  // A potência que sai do POP já sofre a atenuação inicial de conectores/emendas e DIO (1.4 dB)
+  let currentSignal = txPower - INITIAL_LOSS;
 
   const results = [];
 
@@ -54,28 +52,31 @@ function calculateOpticalCascade(txPower, ctos) {
     const cto = ctos[i];
     let rxCto = 0;
     
-    // Perda do splitter de atendimento dentro da CTO (ex: 1:8), que agora pode ser manual por CTO
+    // Perda do splitter de atendimento (NAP) dentro da CTO (Ex: 1:8 -> 10.5 dB)
     const attLoss = SPLITTER_BAL[cto.attSplitter] || 10.5;
 
     if (cto.type === 'desbalanceado') {
       const unbal = SPLITTER_UNBAL[cto.ratio];
       if (!unbal) {
-        results.push({ error: 'Ratio inválido' });
+        results.push({ rx: '--', error: 'Ratio inválido' });
         continue;
       }
-      // O Drop vai para o splitter de atendimento da CTO
+      
+      // Sinal do cliente (ONU) = Sinal que chega na caixa - Perda de Derivação (Drop) - Perda da NAP
       rxCto = currentSignal - unbal.drop - attLoss;
-      // O Pass segue para o próximo ponto na linha
+      
+      // O sinal que segue pela rua é atenuado apenas pela porta de Passagem (Pass) do splitter
       currentSignal = currentSignal - unbal.pass;
     } 
     else {
-      // Balanceado (ex: um 1:4 na rua dividindo para as CTOs 1:8)
+      // Balanceado: a rede é dividida simetricamente
       const bal = SPLITTER_BAL[cto.ratio] || 7.0; 
       rxCto = currentSignal - bal - attLoss;
+      currentSignal = currentSignal - bal; // simplificação teórica, balanceado divide tudo igual.
     }
 
-    // Subtrai perda de conector/fusão em cada caixa
-    currentSignal -= CONNECTOR_LOSS;
+    // Ao sair da caixa para ir até a próxima, temos a perda da fibra e emendas (0.2525 dB)
+    currentSignal -= LOSS_BETWEEN_BOXES;
 
     results.push({
       rx: rxCto.toFixed(2),
