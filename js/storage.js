@@ -88,7 +88,7 @@ async function loadFromCloud() {
         .from('ftth_projects')
         .select('data')
         .eq('id', 1)
-        .single();
+        .maybeSingle();
         
       if (!error && data && data.data) {
         console.log('☁️ Projeto carregado da Nuvem!');

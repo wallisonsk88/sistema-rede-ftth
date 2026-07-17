@@ -10,7 +10,7 @@ map.on('click', e => {
   const { lat, lng } = e.latlng;
 
   if (STATE.tool === 'pop') {
-    placePOP(lat, lng);
+    addPOP(lat, lng);
   } else if (STATE.tool === 'ruler') {
     rulerAddPoint(lat, lng);
   } else if (STATE.tool === 'cable') {
