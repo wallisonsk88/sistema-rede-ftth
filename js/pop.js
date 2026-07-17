@@ -55,7 +55,11 @@ function createPOPMarker(obj) {
 
   m.on('click', ev => {
     L.DomEvent.stopPropagation(ev);
-    handleElementClick(obj.id);
+    if (STATE.tool === 'cable') {
+      if (typeof startCable === 'function') startCable(obj.id, obj.lat, obj.lng);
+    } else {
+      handleElementClick(obj.id);
+    }
   });
 
   m.on('dragend', ev => {

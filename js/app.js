@@ -18,12 +18,25 @@ map.on('click', e => {
     rulerAddPoint(lat, lng);
     return;
   }
+
+  if (STATE.tool === 'cable') {
+    if (typeof cableAddPoint === 'function') cableAddPoint(lat, lng);
+    return;
+  }
+
+  if (STATE.tool === 'cto_place') {
+    if (typeof placeCTO === 'function') placeCTO(lat, lng);
+    return;
+  }
 });
 
 map.on('dblclick', e => {
   L.DomEvent.stopPropagation(e);
   if (STATE.tool === 'ruler') {
     finishRuler();
+  }
+  if (STATE.tool === 'cable') {
+    if (typeof finishCable === 'function') finishCable();
   }
 });
 
@@ -43,6 +56,7 @@ function init() {
   loadLocal();
   updateStatusBar();
   renderPanel();
+  if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
 }
 
 window.onload = init;

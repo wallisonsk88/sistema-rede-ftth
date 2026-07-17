@@ -18,6 +18,14 @@ function saveLocal() {
       ponPorts: o.ponPorts,
       pons: o.pons,
     })),
+    cables: STATE.cables.map(c => ({
+      id: c.id,
+      name: c.name,
+      popId: c.popId,
+      path: c.path,
+      fibers: c.fibers,
+      fiberMapping: c.fiberMapping,
+    })),
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -40,6 +48,11 @@ function loadLocal() {
       o.layer = createPOPMarker(o);
       STATE.olts.push(o);
     });
+
+    (data.cables || []).forEach(c => {
+      STATE.cables.push(c);
+      if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
+    });
   } catch (e) {
     console.error('Erro ao carregar:', e);
   }
@@ -60,6 +73,14 @@ function exportProject() {
       outputPower: o.outputPower,
       ponPorts: o.ponPorts,
       pons: o.pons,
+    })),
+    cables: STATE.cables.map(c => ({
+      id: c.id,
+      name: c.name,
+      popId: c.popId,
+      path: c.path,
+      fibers: c.fibers,
+      fiberMapping: c.fiberMapping,
     })),
   };
 
@@ -89,6 +110,11 @@ function importProject(event) {
         STATE.olts.push(o);
       });
 
+      (data.cables || []).forEach(c => {
+        STATE.cables.push(c);
+        if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
+      });
+
       updateStatusBar();
       renderPanel();
       setTimeout(fitBounds, 300);
@@ -104,7 +130,10 @@ function importProject(event) {
 /** Limpa todo o projeto */
 function clearAll(silent = false) {
   STATE.olts.forEach(o => { if (o.layer) map.removeLayer(o.layer); });
+  STATE.cables.forEach(c => { if (c.layer) map.removeLayer(c.layer); });
+  
   STATE.olts = [];
+  STATE.cables = [];
   STATE.selectedId = null;
   STATE.nextOLTNum = 1;
 

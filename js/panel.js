@@ -40,6 +40,9 @@ function renderProps() {
   const pop = STATE.olts.find(o => o.id === id);
   if (pop) return renderPOPProps(pop);
 
+  const cable = STATE.cables.find(c => c.id === id);
+  if (cable) return renderCableProps(cable);
+
   return '';
 }
 
@@ -208,8 +211,12 @@ function renderPOPProps(pop) {
                    }
                    ratioSelect += `</select>`;
                    
+                   let placeBtn = `<button title="Posicionar no mapa" onclick="preparePlaceCTO('${pop.id}', ${i}, '${ramal.id}', ${idx})" style="background:none; border:none; cursor:pointer; font-size:12px; padding:0; margin-right:4px;">${cto.lat ? '✅' : '📍'}</button>`;
+
                    ramalHtml += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:10px; gap:4px;">
-                     <span style="flex:1; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${cto.name}">${cto.name}</span>
+                     <span style="display:flex; align-items:center; flex:1; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${cto.name}">
+                       ${placeBtn} ${cto.name}
+                     </span>
                      <span style="flex:1">${ratioSelect}</span>
                      <span style="flex:1; text-align:right; font-weight:700; ${colorStyle}">${res ? res.rx + ' dBm' : '--'}</span>
                    </div>`;
@@ -282,4 +289,74 @@ function deleteElement(id) {
   updateStatusBar();
   renderPanel();
   saveLocal();
+}
+
+/** Renderiza as propriedades de um Cabo selecionado */
+function renderCableProps(cable) {
+  const pop = STATE.olts.find(o => o.id === cable.popId);
+  if (!pop) return '<div class="empty-panel">POP não encontrado para este cabo.</div>';
+  
+  let html = `
+    <div class="prop-group">
+      <label>Nome do Cabo</label>
+      <input type="text" class="input-full" value="${cable.name}" onchange="cableUpdate('${cable.id}', 'name', this.value)">
+    </div>
+    
+    <div class="prop-group">
+      <label>Capacidade (Fibras)</label>
+      <select class="input-full" onchange="cableUpdate('${cable.id}', 'fibers', parseInt(this.value))">
+        ${[2, 4, 6, 12, 24, 36, 48, 72, 144].map(v => `<option value="${v}" ${cable.fibers === v ? 'selected' : ''}>${v} Fibras (FO)</option>`).join('')}
+      </select>
+    </div>
+    
+    <hr style="border:0; border-top:1px dashed var(--border); margin:15px 0;">
+    <h3 style="margin-bottom:10px; font-size:12px; color:var(--text); text-transform:uppercase;">Alocação de Fibras</h3>
+  `;
+  
+  // Coletar todos os ramais disponíveis no POP
+  let allRamais = [];
+  pop.pons.forEach(pon => {
+    if(pon.ramais) {
+      pon.ramais.forEach(r => {
+        allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color });
+      });
+    }
+  });
+
+  html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
+  
+  for(let i=1; i<=cable.fibers; i++) {
+    const cIdx = (i - 1) % FIBER_COLORS.length;
+    const fColor = FIBER_COLORS[cIdx];
+    const mappedRamalId = cable.fiberMapping[i] || '';
+    
+    let options = `<option value="">-- Livre --</option>`;
+    allRamais.forEach(r => {
+      options += `<option value="${r.id}" ${mappedRamalId === r.id ? 'selected' : ''}>${r.name}</option>`;
+    });
+
+    html += `
+      <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid var(--border);">
+        <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+        <div style="flex:1;">
+          <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
+          <select style="width:100%; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;" 
+                  onchange="setFiberMapping('${cable.id}', ${i}, this.value)">
+            ${options}
+          </select>
+        </div>
+        ${mappedRamalId ? `<button onclick="highlightRamal('${pop.id}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px; transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>` : `<div style="width:26px"></div>`}
+      </div>
+    `;
+  }
+  
+  html += `</div>`;
+  
+  html += `
+    <div style="margin-top:15px;">
+      <button class="btn-full" onclick="clearHighlight()">🧹 Limpar Destaques</button>
+    </div>
+  `;
+
+  return html;
 }
