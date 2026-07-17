@@ -43,6 +43,9 @@ function renderProps() {
   const cable = STATE.cables.find(c => c.id === id);
   if (cable) return renderCableProps(cable);
 
+  const splice = STATE.splices.find(s => s.id === id);
+  if (splice) return renderSpliceProps(splice);
+
   return '';
 }
 
