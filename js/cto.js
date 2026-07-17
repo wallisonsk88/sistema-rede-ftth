@@ -102,20 +102,11 @@ function placeCTO(lat, lng) {
     unplacedCto.cableId = cableId;
     ctoName = unplacedCto.name;
   } else {
-    const ctoCount = ramal.ctos.length + 1;
-    let defaultRatio = ramal.type === 'desbalanceado' ? '10/90' : '1:8';
-    if (ramal.type === 'desbalanceado' && ctoCount === 1) defaultRatio = '5/95';
-
-    const newCto = {
-      name: 'CTO ' + String(ctoCount).padStart(2, '0'),
-      ratio: defaultRatio,
-      lat: snap.latlng.lat,
-      lng: snap.latlng.lng,
-      cableId: cableId
-    };
-
-    ramal.ctos.push(newCto);
-    ctoName = newCto.name;
+    // Se acabaram as CTOs geradas previamente, bloqueia o lançamento
+    toast(`⚠️ Limite atingido! Todas as CTOs deste ramal já foram colocadas no mapa.`);
+    setTool('select');
+    placingRamalContext = null;
+    return;
   }
 
   saveLocal();
