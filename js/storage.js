@@ -22,10 +22,14 @@ function saveLocal() {
       id: c.id,
       name: c.name,
       popId: c.popId,
+      sourceType: c.sourceType,
+      sourceId: c.sourceId,
       path: c.path,
       fibers: c.fibers,
       fiberMapping: c.fiberMapping,
     })),
+    splices: STATE.splices,
+    ctos: STATE.ctos
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -43,6 +47,8 @@ function loadLocal() {
     const data = JSON.parse(json);
     document.getElementById('projectName').value = data.projectName || 'Meu Projeto de Rede';
     STATE.nextOLTNum = data.nextOLTNum || 1;
+    STATE.splices = data.splices || [];
+    STATE.ctos = data.ctos || [];
 
     (data.olts || []).forEach(o => {
       o.layer = createPOPMarker(o);
@@ -78,10 +84,14 @@ function exportProject() {
       id: c.id,
       name: c.name,
       popId: c.popId,
+      sourceType: c.sourceType,
+      sourceId: c.sourceId,
       path: c.path,
       fibers: c.fibers,
       fiberMapping: c.fiberMapping,
     })),
+    splices: STATE.splices,
+    ctos: STATE.ctos
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -104,6 +114,8 @@ function importProject(event) {
       clearAll(true);
       document.getElementById('projectName').value = data.projectName || 'Projeto Importado';
       STATE.nextOLTNum = data.nextOLTNum || 1;
+      STATE.splices = data.splices || [];
+      STATE.ctos = data.ctos || [];
 
       (data.olts || []).forEach(o => {
         o.layer = createPOPMarker(o);
@@ -117,6 +129,8 @@ function importProject(event) {
 
       updateStatusBar();
       renderPanel();
+      if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
+      if (typeof renderAllSplices === 'function') renderAllSplices();
       setTimeout(fitBounds, 300);
       toast('📂 Projeto importado!');
     } catch (err) {
@@ -131,9 +145,13 @@ function importProject(event) {
 function clearAll(silent = false) {
   STATE.olts.forEach(o => { if (o.layer) map.removeLayer(o.layer); });
   STATE.cables.forEach(c => { if (c.layer) map.removeLayer(c.layer); });
+  if (typeof ctoMarkersLayer !== 'undefined') ctoMarkersLayer.clearLayers();
+  if (typeof spliceMarkersLayer !== 'undefined') spliceMarkersLayer.clearLayers();
   
   STATE.olts = [];
   STATE.cables = [];
+  STATE.splices = [];
+  STATE.ctos = [];
   STATE.selectedId = null;
   STATE.nextOLTNum = 1;
 

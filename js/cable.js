@@ -109,6 +109,42 @@ function clearCableDraw() {
   map.off('mousemove', onCableMouseMove);
 }
 
+/** Calcula a distancia de um ponto projetado ao longo de um cabo */
+function getDistanceAlongCable(latlng, cablePath) {
+  if (!cablePath || cablePath.length < 2) return 0;
+  
+  const pt = map.latLngToLayerPoint(latlng);
+  let minDistanceSq = Infinity;
+  let closestLayerPt = null;
+  let closestSegmentIndex = 0;
+
+  for (let i = 0; i < cablePath.length - 1; i++) {
+    const p1 = map.latLngToLayerPoint(cablePath[i]);
+    const p2 = map.latLngToLayerPoint(cablePath[i + 1]);
+    
+    // Funcoes do cto.js
+    const projPt = getClosestPointOnSegment(pt, p1, p2);
+    const sqDist = dist2(pt, projPt);
+    
+    if (sqDist < minDistanceSq) {
+      minDistanceSq = sqDist;
+      closestLayerPt = projPt;
+      closestSegmentIndex = i;
+    }
+  }
+
+  if (!closestLayerPt) return 0;
+
+  let distToPt = 0;
+  for (let i = 0; i < closestSegmentIndex; i++) {
+    distToPt += map.distance(cablePath[i], cablePath[i+1]);
+  }
+  const snapLatLng = map.layerPointToLatLng(closestLayerPt);
+  distToPt += map.distance(cablePath[closestSegmentIndex], snapLatLng);
+
+  return distToPt;
+}
+
 /** Renderiza um cabo já salvo no estado */
 function renderCableOnMap(cableObj) {
   const pl = L.polyline(cableObj.path, {
@@ -122,7 +158,7 @@ function renderCableOnMap(cableObj) {
     if (STATE.tool === 'eraser') {
       removeCable(cableObj.id);
     } else {
-      handleElementClick(cableObj.id);
+      handleElementClick(cableObj.id, ev.latlng);
     }
   });
   

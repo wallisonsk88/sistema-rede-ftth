@@ -266,11 +266,12 @@ function renderPOPProps(pop) {
 // ================================================================
 
 /** Lida com o clique em um elemento do mapa */
-function handleElementClick(id) {
+function handleElementClick(id, latlng) {
   if (STATE.tool === 'eraser') {
     deleteElement(id);
     return;
   }
+  if (latlng) STATE.clickedLatLng = latlng;
   selectElement(id);
 }
 
@@ -353,35 +354,45 @@ function renderCableProps(cable) {
   
   html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
   
-  // Busca CEOs conectadas a este cabo
-  const cableSplices = STATE.splices.filter(s => s.cableId === cable.id);
+  // Calculate click distance
+  let clickDist = 0;
+  if (STATE.clickedLatLng) {
+    clickDist = getDistanceAlongCable(STATE.clickedLatLng, cable.path);
+  }
+
+  // Busca CEOs conectadas a este cabo e pre-calcula distâncias
+  const cableSplices = STATE.splices
+    .filter(s => s.cableId === cable.id)
+    .map(s => ({ ...s, dist: getDistanceAlongCable([s.lat, s.lng], cable.path) }));
 
   for(let i=1; i<=cable.fibers; i++) {
     const cIdx = (i - 1) % FIBER_COLORS.length;
     const fColor = FIBER_COLORS[cIdx];
     const mappedRamalId = cable.fiberMapping[i] || '';
     
-    // Verifica se esta fibra foi fundida em alguma CEO
-    let cutSplice = null;
-    let cutDestCable = null;
+    let earliestCutSplice = null;
+    let minCutDist = Infinity;
+
     for (const sp of cableSplices) {
        if (sp.fusions) {
           for (const dCId in sp.fusions) {
              for (const dFib in sp.fusions[dCId]) {
                  if (sp.fusions[dCId][dFib] == i) {
-                     cutSplice = sp;
-                     cutDestCable = STATE.cables.find(c => c.id === dCId);
-                     break;
+                     if (sp.dist < minCutDist) {
+                        minCutDist = sp.dist;
+                        earliestCutSplice = sp;
+                     }
                  }
              }
-             if (cutSplice) break;
           }
        }
-       if (cutSplice) break;
     }
 
-    if (cutSplice) {
-      // Fibra bloqueada por sangria
+    // A fibra morre 1 metro após a CEO.
+    let isDeadAtClick = earliestCutSplice && (clickDist > minCutDist + 1);
+
+    if (isDeadAtClick) {
+      // Fibra morta (após a CEO) - SEM SELECTOR DE RAMAL
       html += `
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid #dc2626; opacity:0.8;">
           <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
