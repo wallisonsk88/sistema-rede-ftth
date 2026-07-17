@@ -31,16 +31,16 @@ function startCable(popId, lat, lng) {
   currentCablePoints = [[lat, lng]];
   
   currentCablePolyline = L.polyline(currentCablePoints, {
-    color: '#000000',
+    color: '#38bdf8', // Azul claro chamativo para o desenho
     weight: 4,
-    opacity: 0.8
+    opacity: 0.9
   }).addTo(map);
 
   currentCableCursorLine = L.polyline([], {
-    color: '#000000',
+    color: '#38bdf8',
     weight: 4,
     dashArray: '5, 10',
-    opacity: 0.5
+    opacity: 0.6
   }).addTo(map);
 
   map.on('mousemove', onCableMouseMove);
@@ -103,7 +103,7 @@ function clearCableDraw() {
 /** Renderiza um cabo já salvo no estado */
 function renderCableOnMap(cableObj) {
   const pl = L.polyline(cableObj.path, {
-    color: '#222',
+    color: '#cbd5e1', // Cinza claro para contrastar com o fundo escuro
     weight: 4,
     opacity: 0.9
   }).addTo(map);
@@ -174,7 +174,7 @@ function highlightRamal(popId, ramalId) {
       if (hasRamal) {
         c.layer.setStyle({ color: '#3b82f6', weight: 6, opacity: 1 });
       } else {
-        c.layer.setStyle({ color: '#222', weight: 4, opacity: 0.3 });
+        c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.4 });
       }
     }
   });
@@ -183,7 +183,7 @@ function highlightRamal(popId, ramalId) {
 function clearHighlight() {
   STATE.cables.forEach(c => {
     if (c.layer) {
-      c.layer.setStyle({ color: '#222', weight: 4, opacity: 0.9 });
+      c.layer.setStyle({ color: '#cbd5e1', weight: 4, opacity: 0.9 });
     }
   });
 }
