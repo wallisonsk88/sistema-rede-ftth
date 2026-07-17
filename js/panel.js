@@ -435,6 +435,7 @@ function renderCableProps(cable) {
 
 
 function renderSpliceProps(splice) {
+  if (!splice.fusions) splice.fusions = {};
   const sourceCable = STATE.cables.find(c => c.id === splice.cableId);
   const derivedCables = STATE.cables.filter(c => c.sourceType === 'splice' && c.sourceId === splice.id);
   
@@ -506,6 +507,7 @@ function renderSpliceProps(splice) {
 window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
    const splice = STATE.splices.find(s => s.id === spliceId);
    if (splice) {
+      if (!splice.fusions) splice.fusions = {};
       if (!splice.fusions[destCableId]) splice.fusions[destCableId] = {};
       if (srcFiber) {
          splice.fusions[destCableId][destFiber] = parseInt(srcFiber);
