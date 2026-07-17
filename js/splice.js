@@ -106,7 +106,7 @@ function renderAllSplices() {
         if (STATE.tool === 'eraser') {
             removeSplice(splice.id);
         } else {
-            handleElementClick(splice.id);
+            selectElement(splice.id);
         }
     });
 

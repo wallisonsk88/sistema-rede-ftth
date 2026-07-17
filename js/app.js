@@ -10,7 +10,7 @@ map.on('click', e => {
   const { lat, lng } = e.latlng;
 
   if (STATE.tool === 'pop') {
-    addPOP(lat, lng);
+    placePOP(lat, lng);
   } else if (STATE.tool === 'ruler') {
     rulerAddPoint(lat, lng);
   } else if (STATE.tool === 'cable') {
@@ -49,6 +49,7 @@ function init() {
   updateStatusBar();
   renderPanel();
   if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
+  if (typeof renderAllSplices === 'function') renderAllSplices();
 }
 
 window.onload = init;
