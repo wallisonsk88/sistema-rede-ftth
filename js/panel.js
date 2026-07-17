@@ -346,10 +346,10 @@ function renderCableProps(cable) {
             ${options}
           </select>
         </div>
-        ${mappedRamalId ? `
+        ${mappedRamalId && rootPopId ? `
           <div style="display:flex;">
-            <button onclick="highlightRamal('${pop.id}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">🔍</button>
-            <button onclick="preparePlaceCTO('${pop.id}', '${mappedRamalId}', '${cable.id}')" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
+            <button onclick="highlightRamal('${rootPopId}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">🔍</button>
+            <button onclick="preparePlaceCTO('${rootPopId}', '${mappedRamalId}', '${cable.id}')" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
           </div>
         ` : `<div style="width:52px"></div>`}
       </div>
@@ -365,4 +365,89 @@ function renderCableProps(cable) {
   `;
 
   return html;
+}
+
+
+function renderSpliceProps(splice) {
+  const sourceCable = STATE.cables.find(c => c.id === splice.cableId);
+  const derivedCables = STATE.cables.filter(c => c.sourceType === 'splice' && c.sourceId === splice.id);
+  
+  let html = `
+    <div class="panel-header">
+      <div style="font-size:14px; margin-bottom:5px;">🗃️ ${splice.name}</div>
+      <div style="font-size:10px; opacity:0.8;">Caixa de Emenda Óptica (Sangria)</div>
+    </div>
+    
+    <div style="padding:15px;">
+      <button class="btn-full primary" style="margin-bottom:15px;" onclick="startCableFromSplice('${splice.id}')">
+        🔌 Lançar Cabo Derivado
+      </button>
+
+      <div class="pon-card">
+        <div class="pon-header" style="background:var(--border);">
+           Entrada (Tronco): <b>${sourceCable ? sourceCable.name : 'Nenhum'}</b>
+        </div>
+      </div>
+  `;
+
+  if (derivedCables.length === 0) {
+      html += `<div style="font-size:11px; color:var(--text2); text-align:center; padding:20px;">Nenhum cabo derivado ainda.</div>`;
+  } else {
+      derivedCables.forEach(dc => {
+         html += `
+          <div class="pon-card" style="margin-top:15px;">
+            <div class="pon-header">
+               📍 Saída: <b>${dc.name}</b>
+            </div>
+            <div style="padding:10px;">
+               <div style="font-size:10px; color:var(--text2); margin-bottom:8px;">
+                 Fusão de Fibras (Sangria):
+               </div>
+         `;
+         
+         for (let i = 1; i <= dc.fibers; i++) {
+           const subFColor = FIBER_COLORS[(i-1) % FIBER_COLORS.length];
+           let sourceOptions = '';
+           for (let j = 1; j <= (sourceCable ? sourceCable.fibers : 12); j++) {
+              const srcFColor = FIBER_COLORS[(j-1) % FIBER_COLORS.length];
+              const currentSrcFiber = splice.fusions[dc.id] ? splice.fusions[dc.id][i] : null;
+              const selected = currentSrcFiber == j ? 'selected' : '';
+              sourceOptions += `<option value="${j}" ${selected}>F${j} (${srcFColor.name}) do Tronco</option>`;
+           }
+           
+           html += `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg); border:1px solid var(--border); padding:6px; border-radius:4px; margin-bottom:6px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div style="width:12px; height:12px; border-radius:50%; background:${subFColor.hex}"></div>
+                <span style="font-size:12px; color:var(--text); font-weight:600;">F${i} - ${subFColor.name}</span>
+              </div>
+              <select onchange="setFusion('${splice.id}', '${dc.id}', ${i}, this.value)" style="width:140px; font-size:10px; padding:4px;">
+                <option value="">Não fundida</option>
+                ${sourceOptions}
+              </select>
+            </div>
+           `;
+         }
+         
+         html += `</div></div>`;
+      });
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
+   const splice = STATE.splices.find(s => s.id === spliceId);
+   if (splice) {
+      if (!splice.fusions[destCableId]) splice.fusions[destCableId] = {};
+      if (srcFiber) {
+         splice.fusions[destCableId][destFiber] = parseInt(srcFiber);
+      } else {
+         delete splice.fusions[destCableId][destFiber];
+      }
+      saveLocal();
+      toast('🔗 Fusão atualizada na CEO');
+      renderPanel();
+   }
 }

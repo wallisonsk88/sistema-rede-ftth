@@ -6,13 +6,15 @@ const toolNames = {
   select: 'Selecionar',
   pop:    'Colocar POP',
   cable:  'Lançar Cabo',
+  splice: 'Caixa de Emenda',
   ruler:  'Régua',
   eraser: 'Apagar',
 };
 
 const toolHints = {
   pop:    '📍 Clique no mapa para posicionar o POP / OLT',
-  cable:  '🔌 Clique num POP para iniciar o cabo. Vá clicando para traçar e Duplo-clique para terminar',
+  cable:  '🔌 Clique num POP ou CEO para iniciar o cabo. Duplo-clique para terminar',
+  splice: '🗃️ Clique em cima de um cabo existente para inserir a Caixa de Emenda (CEO)',
   ruler:  '📏 Clique para marcar pontos · Duplo-clique para finalizar',
   eraser: '🗑️ Clique em um elemento para apagá-lo',
 };

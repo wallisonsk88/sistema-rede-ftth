@@ -2,7 +2,8 @@
  * cable.js — Lógica de criação e manipulação de cabos no mapa
  */
 
-let currentCablePopId = null;
+let currentCableSourceType = null; // 'pop' ou 'splice'
+let currentCableSourceId = null;
 let currentCablePoints = [];
 let currentCablePolyline = null;
 let currentCableCursorLine = null; // Linha temp que segue o mouse
@@ -23,11 +24,17 @@ const FIBER_COLORS = [
   { hex: '#06b6d4', name: 'Aqua' }
 ];
 
-/** Inicia o desenho do cabo a partir de um POP */
+/** Inicia o desenho do cabo a partir de um POP (legado) */
 function startCable(popId, lat, lng) {
+  startCableExt('pop', popId, lat, lng);
+}
+
+/** Inicia o desenho do cabo a partir de qualquer origem */
+function startCableExt(sourceType, sourceId, lat, lng) {
   if (currentCablePolyline) clearCableDraw();
   
-  currentCablePopId = popId;
+  currentCableSourceType = sourceType;
+  currentCableSourceId = sourceId;
   currentCablePoints = [[lat, lng]];
   
   currentCablePolyline = L.polyline(currentCablePoints, {
@@ -56,7 +63,7 @@ function onCableMouseMove(e) {
 
 /** Adiciona um ponto ao cabo atual */
 function cableAddPoint(lat, lng) {
-  if (!currentCablePopId) return toast('⚠️ Clique num POP para iniciar o cabo!');
+  if (!currentCableSourceId) return toast('⚠️ Clique numa Origem (POP/CEO) para iniciar o cabo!');
   
   currentCablePoints.push([lat, lng]);
   currentCablePolyline.setLatLngs(currentCablePoints);
@@ -64,7 +71,7 @@ function cableAddPoint(lat, lng) {
 
 /** Finaliza o traçado do cabo e salva */
 function finishCable() {
-  if (!currentCablePopId || currentCablePoints.length < 2) {
+  if (!currentCableSourceId || currentCablePoints.length < 2) {
     clearCableDraw();
     return;
   }
@@ -73,7 +80,8 @@ function finishCable() {
   const obj = {
     id,
     name: 'Cabo ' + (STATE.cables.length + 1),
-    popId: currentCablePopId,
+    sourceType: currentCableSourceType,
+    sourceId: currentCableSourceId,
     path: [...currentCablePoints],
     fibers: 12,          // Capacidade padrão
     fiberMapping: {}     // { "1": "ramalId" }
@@ -93,7 +101,8 @@ function finishCable() {
 
 /** Limpa o estado temporário de desenho */
 function clearCableDraw() {
-  currentCablePopId = null;
+  currentCableSourceType = null;
+  currentCableSourceId = null;
   currentCablePoints = [];
   if (currentCablePolyline) { map.removeLayer(currentCablePolyline); currentCablePolyline = null; }
   if (currentCableCursorLine) { map.removeLayer(currentCableCursorLine); currentCableCursorLine = null; }

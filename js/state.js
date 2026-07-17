@@ -6,6 +6,7 @@ const STATE = {
   tool: 'select',
   olts: [],          // POPs / OLTs
   cables: [],        // Cabos
+  splices: [],       // Caixas de Emenda (CEOs)
   selectedId: null,
   rulerPoints: [],
   rulerLines: [],

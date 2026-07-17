@@ -11,22 +11,14 @@ map.on('click', e => {
 
   if (STATE.tool === 'pop') {
     addPOP(lat, lng);
-    return;
-  }
-
-  if (STATE.tool === 'ruler') {
+  } else if (STATE.tool === 'ruler') {
     rulerAddPoint(lat, lng);
-    return;
-  }
-
-  if (STATE.tool === 'cable') {
+  } else if (STATE.tool === 'cable') {
     if (typeof cableAddPoint === 'function') cableAddPoint(lat, lng);
-    return;
-  }
-
-  if (STATE.tool === 'cto_place') {
+  } else if (STATE.tool === 'cto_place') {
     if (typeof placeCTO === 'function') placeCTO(lat, lng);
-    return;
+  } else if (STATE.tool === 'splice') {
+    if (typeof placeSplice === 'function') placeSplice(lat, lng);
   }
 });
 
