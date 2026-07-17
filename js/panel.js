@@ -442,66 +442,119 @@ function renderSpliceProps(splice) {
   let html = `
     <div class="panel-header">
       <div style="font-size:14px; margin-bottom:5px;">🗃️ ${splice.name}</div>
-      <div style="font-size:10px; opacity:0.8;">Caixa de Emenda Óptica (Sangria)</div>
+      <div style="font-size:10px; opacity:0.8;">Painel de Fusão Kanban (Arrastar e Soltar)</div>
     </div>
     
     <div style="padding:15px;">
       <button class="btn-full primary" style="margin-bottom:15px;" onclick="startCableFromSplice('${splice.id}')">
         🔌 Lançar Cabo Derivado
       </button>
-
-      <div class="pon-card">
-        <div class="pon-header" style="background:var(--border);">
-           Entrada (Tronco): <b>${sourceCable ? sourceCable.name : 'Nenhum'}</b>
-        </div>
-      </div>
   `;
 
   if (derivedCables.length === 0) {
-      html += `<div style="font-size:11px; color:var(--text2); text-align:center; padding:20px;">Nenhum cabo derivado ainda.</div>`;
-  } else {
-      derivedCables.forEach(dc => {
-         html += `
-          <div class="pon-card" style="margin-top:15px;">
-            <div class="pon-header">
-               📍 Saída: <b>${dc.name}</b>
-            </div>
-            <div style="padding:10px;">
-               <div style="font-size:10px; color:var(--text2); margin-bottom:8px;">
-                 Fusão de Fibras (Sangria):
-               </div>
-         `;
-         
-         for (let i = 1; i <= dc.fibers; i++) {
-           const subFColor = FIBER_COLORS[(i-1) % FIBER_COLORS.length];
-           let sourceOptions = '';
-           for (let j = 1; j <= (sourceCable ? sourceCable.fibers : 12); j++) {
-              const srcFColor = FIBER_COLORS[(j-1) % FIBER_COLORS.length];
-              const currentSrcFiber = splice.fusions[dc.id] ? splice.fusions[dc.id][i] : null;
-              const selected = currentSrcFiber == j ? 'selected' : '';
-              sourceOptions += `<option value="${j}" ${selected}>F${j} (${srcFColor.name}) do Tronco</option>`;
-           }
-           
-           html += `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg); border:1px solid var(--border); padding:6px; border-radius:4px; margin-bottom:6px;">
-              <div style="display:flex; align-items:center; gap:8px;">
-                <div style="width:12px; height:12px; border-radius:50%; background:${subFColor.hex}"></div>
-                <span style="font-size:12px; color:var(--text); font-weight:600;">F${i} - ${subFColor.name}</span>
-              </div>
-              <select onchange="setFusion('${splice.id}', '${dc.id}', ${i}, this.value)" style="width:140px; font-size:10px; padding:4px;">
-                <option value="">Não fundida</option>
-                ${sourceOptions}
-              </select>
-            </div>
-           `;
-         }
-         
-         html += `</div></div>`;
-      });
+      html += `<div style="font-size:11px; color:var(--text2); text-align:center; padding:20px;">Nenhum cabo derivado ainda. Lance um cabo derivado para começar a fusão.</div></div>`;
+      return html;
   }
+
+  // Draw Kanban Board for each derived cable
+  derivedCables.forEach(dc => {
+    html += `
+      <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; margin-bottom:15px; padding:10px;">
+        <div style="text-align:center; font-size:11px; font-weight:bold; margin-bottom:10px; color:var(--text);">Fusão: ${sourceCable ? sourceCable.name : 'Tronco'} ➡️ ${dc.name}</div>
+        <div style="display:flex; gap:10px;">
+          
+          <!-- Left Column (Trunk Fibers) -->
+          <div style="flex:1; display:flex; flex-direction:column; gap:6px; border-right:1px dashed var(--border); padding-right:10px;">
+            <div style="font-size:10px; text-align:center; color:var(--text2); margin-bottom:4px;">Cabo Tronco (Arraste)</div>
+    `;
+    
+    // Check which trunk fibers are already used in THIS splice
+    const usedTrunkFibers = {};
+    derivedCables.forEach(ddc => {
+       if (splice.fusions[ddc.id]) {
+          Object.values(splice.fusions[ddc.id]).forEach(f => usedTrunkFibers[f] = true);
+       }
+    });
+
+    const trunkFibers = sourceCable ? sourceCable.fibers : 12;
+    for (let j = 1; j <= trunkFibers; j++) {
+       const srcFColor = FIBER_COLORS[(j-1) % FIBER_COLORS.length];
+       if (usedTrunkFibers[j]) {
+          html += `
+            <div style="padding:6px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:6px; opacity:0.5;">
+              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:10px; color:var(--text2)">F${j} (Em uso)</span>
+            </div>
+          `;
+       } else {
+          html += `
+            <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:6px; border-radius:4px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:10px; font-weight:600;">F${j} - ${srcFColor.name}</span>
+            </div>
+          `;
+       }
+    }
+
+    html += `</div>
+          <!-- Right Column (Derived Fibers) -->
+          <div style="flex:1; display:flex; flex-direction:column; gap:6px; padding-left:10px;">
+            <div style="font-size:10px; text-align:center; color:var(--text2); margin-bottom:4px;">Cabo Derivado (Solte Aqui)</div>
+    `;
+
+    for (let i = 1; i <= dc.fibers; i++) {
+       const subFColor = FIBER_COLORS[(i-1) % FIBER_COLORS.length];
+       const currentSrcFiber = splice.fusions[dc.id] ? splice.fusions[dc.id][i] : null;
+       
+       if (currentSrcFiber) {
+           const srcFColor = FIBER_COLORS[(currentSrcFiber-1) % FIBER_COLORS.length];
+           html += `
+             <div style="padding:6px; border-radius:4px; border:1px solid #3b82f6; background:rgba(59, 130, 246, 0.15); display:flex; justify-content:space-between; align-items:center;">
+               <div style="display:flex; align-items:center; gap:4px;">
+                 <div style="width:8px; height:8px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                 <span style="font-size:10px; font-weight:bold; color:#60a5fa;">F${currentSrcFiber} ➡️ F${i}</span>
+                 <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+               </div>
+               <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer Fusão">✖</button>
+             </div>
+           `;
+       } else {
+           html += `
+             <div ondragover="allowDrop(event)" ondrop="dropFiber(event, '${splice.id}', '${dc.id}', ${i})" 
+                  style="padding:6px; border-radius:4px; border:1px dashed var(--border); background:rgba(255,255,255,0.02); display:flex; align-items:center; gap:6px; min-height:28px;">
+               <div style="width:12px; height:12px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+               <span style="font-size:10px; color:var(--text2)">F${i} (Solte a fibra)</span>
+             </div>
+           `;
+       }
+    }
+
+    html += `</div></div></div>`;
+  });
 
   html += `</div>`;
   return html;
+}
+
+// Funções de Arrastar e Soltar (Kanban)
+window.dragFiber = function(ev, srcFiberIndex) {
+  ev.dataTransfer.setData("srcFiber", srcFiberIndex);
+}
+
+window.allowDrop = function(ev) {
+  ev.preventDefault();
+}
+
+window.dropFiber = function(ev, spliceId, destCableId, destFiberIndex) {
+  ev.preventDefault();
+  const srcFiber = ev.dataTransfer.getData("srcFiber");
+  if (srcFiber) {
+    setFusion(spliceId, destCableId, destFiberIndex, srcFiber);
+  }
+}
+
+window.removeFusion = function(spliceId, destCableId, destFiberIndex) {
+  setFusion(spliceId, destCableId, destFiberIndex, null);
 }
 
 window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
@@ -515,7 +568,7 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
          delete splice.fusions[destCableId][destFiber];
       }
       saveLocal();
-      toast('🔗 Fusão atualizada na CEO');
+      toast('🔗 Matriz de fusão atualizada!');
       renderPanel();
    }
 }
