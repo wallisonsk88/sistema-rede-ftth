@@ -294,14 +294,48 @@ function deleteElement(id) {
 
 /** Renderiza as propriedades de um Cabo selecionado */
 function renderCableProps(cable) {
-  const pop = STATE.olts.find(o => o.id === cable.popId);
-  if (!pop) return '<div class="empty-panel">POP não encontrado para este cabo.</div>';
-  
+  let originName = 'Origem Desconhecida';
+  let rootPopId = null;
+  let allRamais = [];
+
+  if (cable.sourceType === 'pop' || cable.popId) {
+     const pId = cable.sourceId || cable.popId;
+     const pop = STATE.olts.find(o => o.id === pId);
+     if (pop) {
+       originName = 'POP: ' + pop.name;
+       rootPopId = pop.id;
+       pop.pons.forEach(pon => {
+         if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color }));
+       });
+     }
+  } else if (cable.sourceType === 'splice') {
+     const splice = STATE.splices.find(s => s.id === cable.sourceId);
+     if (splice) {
+       originName = 'CEO: ' + splice.name;
+       let currentCable = STATE.cables.find(c => c.id === splice.cableId);
+       while (currentCable && currentCable.sourceType === 'splice') {
+           const parentSplice = STATE.splices.find(s => s.id === currentCable.sourceId);
+           if (!parentSplice) break;
+           currentCable = STATE.cables.find(c => c.id === parentSplice.cableId);
+       }
+       if (currentCable && (currentCable.sourceType === 'pop' || currentCable.popId)) {
+           const pop = STATE.olts.find(o => o.id === (currentCable.sourceId || currentCable.popId));
+           if (pop) {
+             rootPopId = pop.id;
+             pop.pons.forEach(pon => {
+               if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color }));
+             });
+           }
+       }
+     }
+  }
+
   let html = `
     <div class="prop-group">
       <label>Nome do Cabo</label>
       <input type="text" class="input-full" value="${cable.name}" onchange="cableUpdate('${cable.id}', 'name', this.value)">
     </div>
+    <div style="font-size:10px; opacity:0.8; margin-bottom:10px;">${originName}</div>
     
     <div class="prop-group">
       <label>Capacidade (Fibras)</label>
@@ -314,16 +348,6 @@ function renderCableProps(cable) {
     <h3 style="margin-bottom:10px; font-size:12px; color:var(--text); text-transform:uppercase;">Alocação de Fibras</h3>
   `;
   
-  // Coletar todos os ramais disponíveis no POP
-  let allRamais = [];
-  pop.pons.forEach(pon => {
-    if(pon.ramais) {
-      pon.ramais.forEach(r => {
-        allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color });
-      });
-    }
-  });
-
   html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
   
   for(let i=1; i<=cable.fibers; i++) {
