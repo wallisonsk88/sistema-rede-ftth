@@ -353,34 +353,73 @@ function renderCableProps(cable) {
   
   html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
   
+  // Busca CEOs conectadas a este cabo
+  const cableSplices = STATE.splices.filter(s => s.cableId === cable.id);
+
   for(let i=1; i<=cable.fibers; i++) {
     const cIdx = (i - 1) % FIBER_COLORS.length;
     const fColor = FIBER_COLORS[cIdx];
     const mappedRamalId = cable.fiberMapping[i] || '';
     
-    let options = `<option value="">-- Livre --</option>`;
-    allRamais.forEach(r => {
-      options += `<option value="${r.id}" ${mappedRamalId === r.id ? 'selected' : ''}>${r.name}</option>`;
-    });
+    // Verifica se esta fibra foi fundida em alguma CEO
+    let cutSplice = null;
+    let cutDestCable = null;
+    for (const sp of cableSplices) {
+       if (sp.fusions) {
+          for (const dCId in sp.fusions) {
+             for (const dFib in sp.fusions[dCId]) {
+                 if (sp.fusions[dCId][dFib] == i) {
+                     cutSplice = sp;
+                     cutDestCable = STATE.cables.find(c => c.id === dCId);
+                     break;
+                 }
+             }
+             if (cutSplice) break;
+          }
+       }
+       if (cutSplice) break;
+    }
 
-    html += `
-      <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid var(--border);">
-        <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-        <div style="flex:1;">
-          <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
-          <select style="width:100%; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;" 
-                  onchange="setFiberMapping('${cable.id}', ${i}, this.value)">
-            ${options}
-          </select>
-        </div>
-        ${mappedRamalId && rootPopId ? `
-          <div style="display:flex;">
-            <button onclick="highlightRamal('${rootPopId}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">🔍</button>
-            <button onclick="preparePlaceCTO('${rootPopId}', '${mappedRamalId}', '${cable.id}')" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
+    if (cutSplice) {
+      // Fibra bloqueada por sangria
+      html += `
+        <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid #dc2626; opacity:0.8;">
+          <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+          <div style="flex:1;">
+            <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
+            <div style="width:100%; font-size:11px; padding:4px; background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.4); color:#ef4444; border-radius:4px;">
+              ✂️ Cortada (Sangria na ${cutSplice.name})
+            </div>
           </div>
-        ` : `<div style="width:52px"></div>`}
-      </div>
-    `;
+          <div style="width:52px"></div>
+        </div>
+      `;
+    } else {
+      // Fibra normal
+      let options = `<option value="">-- Livre --</option>`;
+      allRamais.forEach(r => {
+        options += `<option value="${r.id}" ${mappedRamalId === r.id ? 'selected' : ''}>${r.name}</option>`;
+      });
+
+      html += `
+        <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid var(--border);">
+          <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+          <div style="flex:1;">
+            <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
+            <select style="width:100%; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;" 
+                    onchange="setFiberMapping('${cable.id}', ${i}, this.value)">
+              ${options}
+            </select>
+          </div>
+          ${mappedRamalId && rootPopId ? `
+            <div style="display:flex;">
+              <button onclick="highlightRamal('${rootPopId}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">🔍</button>
+              <button onclick="preparePlaceCTO('${rootPopId}', '${mappedRamalId}', '${cable.id}')" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
+            </div>
+          ` : `<div style="width:52px"></div>`}
+        </div>
+      `;
+    }
   }
   
   html += `</div>`;
