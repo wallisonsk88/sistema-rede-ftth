@@ -214,26 +214,30 @@ function generateRamalCTOs(popId, ponIndex, ramalId, numCtos) {
   
   const defaultRatios = ['10/90', '15/85', '20/80', '25/75', '30/70', '40/60', '50/50'];
   
-  ramal.ctos = [];
-  for(let i = 0; i < numCtos; i++) {
-    let r = defaultRatios[0];
-    
-    // Simplificação de auto-balanceamento
-    if (ramal.type === 'desbalanceado') {
-      if(i === numCtos - 1 && numCtos > 1) r = '50/50'; 
-      // Em um projeto real, uma rotina desceria tentando equilibrar 
-      // o RX para todos ficarem entre -18 e -22. Aqui iniciamos com um valor razoável editável.
-    } else {
-      r = '1:4'; // balanceado padrão
-    }
-    
-    ramal.ctos.push({
-      id: 'cto_' + Date.now() + '_' + i,
-      name: 'CTO ' + (i+1),
-      ratio: r,
-      type: ramal.type,
-      attSplitter: ramal.attSplitter,
-    });
+  if (!ramal.ctos) ramal.ctos = [];
+  
+  if (ramal.ctos.length > numCtos) {
+     // Trunca mantendo apenas as primeiras CTOs
+     ramal.ctos = ramal.ctos.slice(0, numCtos);
+  } else {
+     // Preenche o restante
+     for(let i = ramal.ctos.length; i < numCtos; i++) {
+        let r = defaultRatios[0];
+        
+        if (ramal.type === 'desbalanceado') {
+          if(i === numCtos - 1 && numCtos > 1) r = '50/50'; 
+        } else {
+          r = '1:4'; 
+        }
+        
+        ramal.ctos.push({
+          id: 'cto_' + Date.now() + '_' + i,
+          name: 'CTO ' + String(i+1).padStart(2, '0'),
+          ratio: r,
+          type: ramal.type,
+          attSplitter: ramal.attSplitter,
+        });
+     }
   }
   
   saveLocal();

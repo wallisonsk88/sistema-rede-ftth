@@ -176,8 +176,8 @@ function renderPOPProps(pop) {
                 
                 <div class="pon-field-row" style="margin-bottom:8px; align-items:flex-end;">
                   <div class="pon-field" style="flex:1">
-                    <label>Gerar cascata de CTOs</label>
-                    <input type="number" min="1" max="32" id="qtde_cto_${ramal.id}" placeholder="Quantidade (Ex: 5)">
+                    <label>Quantidade de CTOs</label>
+                    <input type="number" min="1" max="32" id="qtde_cto_${ramal.id}" placeholder="Ex: 5" value="${ramal.ctos ? ramal.ctos.length : ''}">
                   </div>
                   <button class="btn-full primary" style="flex:1; margin-bottom:0;" onclick="generateRamalCTOs('${pop.id}', ${i}, '${ramal.id}', parseInt(document.getElementById('qtde_cto_${ramal.id}').value))">🪄 Gerar / Calcular</button>
                 </div>
@@ -185,10 +185,13 @@ function renderPOPProps(pop) {
               
               if(ramal.ctos && ramal.ctos.length > 0) {
                  ramalHtml += `<div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
+                   <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px;">
+                     📦 CTOs Lançadas no Mapa: ${ramal.ctos.filter(c => c.lat).length} / ${ramal.ctos.length}
+                   </div>
                    <div style="font-size:9px; color:var(--text2); display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; gap:4px;">
                      <span style="flex:1">CTO</span>
                      <span style="flex:1">Split Entrada</span>
-                     <span style="flex:1; text-align:right">Sinal Estimado</span>
+                     <span style="flex:1; text-align:right">Sinal</span>
                    </div>
                  `;
                  
@@ -211,11 +214,9 @@ function renderPOPProps(pop) {
                    }
                    ratioSelect += `</select>`;
                    
-                   let placeBtn = `<button title="Posicionar no mapa" onclick="preparePlaceCTO('${pop.id}', ${i}, '${ramal.id}', ${idx})" style="background:none; border:none; cursor:pointer; font-size:12px; padding:0; margin-right:4px;">${cto.lat ? '✅' : '📍'}</button>`;
-
                    ramalHtml += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:10px; gap:4px;">
                      <span style="display:flex; align-items:center; flex:1; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${cto.name}">
-                       ${placeBtn} ${cto.name}
+                       ${cto.name}
                      </span>
                      <span style="flex:1">${ratioSelect}</span>
                      <span style="flex:1; text-align:right; font-weight:700; ${colorStyle}">${res ? res.rx + ' dBm' : '--'}</span>
@@ -345,7 +346,12 @@ function renderCableProps(cable) {
             ${options}
           </select>
         </div>
-        ${mappedRamalId ? `<button onclick="highlightRamal('${pop.id}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px; transition:transform 0.1s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>` : `<div style="width:26px"></div>`}
+        ${mappedRamalId ? `
+          <div style="display:flex;">
+            <button onclick="highlightRamal('${pop.id}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">🔍</button>
+            <button onclick="preparePlaceCTO('${pop.id}', '${mappedRamalId}', '${cable.id}')" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
+          </div>
+        ` : `<div style="width:52px"></div>`}
       </div>
     `;
   }
