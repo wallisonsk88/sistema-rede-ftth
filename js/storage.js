@@ -29,8 +29,22 @@ function saveLocal() {
       fibers: c.fibers,
       fiberMapping: c.fiberMapping,
     })),
-    splices: STATE.splices,
-    ctos: STATE.ctos
+    splices: STATE.splices.map(s => ({
+      id: s.id,
+      name: s.name,
+      lat: s.lat,
+      lng: s.lng,
+      cableId: s.cableId,
+      fusions: s.fusions
+    })),
+    ctos: STATE.ctos.map(c => ({
+      id: c.id,
+      name: c.name,
+      lat: c.lat,
+      lng: c.lng,
+      cableId: c.cableId,
+      portCount: c.portCount
+    }))
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -146,8 +160,22 @@ function exportProject() {
       fibers: c.fibers,
       fiberMapping: c.fiberMapping,
     })),
-    splices: STATE.splices,
-    ctos: STATE.ctos
+    splices: STATE.splices.map(s => ({
+      id: s.id,
+      name: s.name,
+      lat: s.lat,
+      lng: s.lng,
+      cableId: s.cableId,
+      fusions: s.fusions
+    })),
+    ctos: STATE.ctos.map(c => ({
+      id: c.id,
+      name: c.name,
+      lat: c.lat,
+      lng: c.lng,
+      cableId: c.cableId,
+      portCount: c.portCount
+    }))
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

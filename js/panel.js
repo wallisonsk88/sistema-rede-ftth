@@ -399,7 +399,7 @@ function renderCableProps(cable) {
           <div style="flex:1;">
             <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
             <div style="width:100%; font-size:11px; padding:4px; background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.4); color:#ef4444; border-radius:4px;">
-              ✂️ Cortada (Sangria na ${cutSplice.name})
+              ✂️ Cortada (Sangria na ${earliestCutSplice.name})
             </div>
           </div>
           <div style="width:52px"></div>
