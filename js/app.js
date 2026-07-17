@@ -44,8 +44,8 @@ function updateStatusBar() {
 //  INICIALIZAÇÃO
 // ================================================================
 
-function init() {
-  loadLocal();
+async function init() {
+  await loadFromCloud();
   updateStatusBar();
   renderPanel();
   if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();

@@ -1,0 +1,4 @@
+const SUPABASE_URL = 'https://dmortcrwpprhpjgfszsi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtb3J0Y3J3cHByaHBqZ2ZzenNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzMDgxMDEsImV4cCI6MjA5OTg4NDEwMX0.vvoQJ3wHwXODui9wU1wvZTXcMqs1BbulzDFCGzAaflg';
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);

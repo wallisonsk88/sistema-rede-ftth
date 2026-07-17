@@ -4,7 +4,8 @@
 
 const STORAGE_KEY = 'meganet_ftth_v2';
 
-/** Salva o estado no localStorage */
+let saveTimeout = null;
+
 function saveLocal() {
   const data = {
     projectName: document.getElementById('projectName').value,
@@ -34,8 +35,76 @@ function saveLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
-    console.error('Erro ao salvar:', e);
+    console.error('Erro ao salvar localmente:', e);
   }
+
+  // Sincronização com a Nuvem (Supabase) via Debounce (1,5 segundos)
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    try {
+      if (typeof supabase === 'undefined') return;
+      const { error } = await supabase
+        .from('ftth_projects')
+        .upsert([{ id: 1, name: data.projectName, data: data, updated_at: new Date() }]);
+      
+      if (error) {
+        if (error.code === '42P01') {
+          console.error('⚠️ Supabase: Tabela "ftth_projects" não existe. Crie a tabela no SQL Editor.');
+        } else {
+          console.error('Erro no Supabase:', error);
+        }
+      } else {
+        console.log('☁️ Projeto sincronizado com a nuvem com sucesso!');
+      }
+    } catch(err) {
+      console.error('Erro de rede ao salvar na nuvem:', err);
+    }
+  }, 1500);
+}
+
+/** Aplica um objeto de dados JSON ao Estado (STATE) */
+function applyDataToState(data) {
+  document.getElementById('projectName').value = data.projectName || 'Meu Projeto de Rede';
+  STATE.nextOLTNum = data.nextOLTNum || 1;
+  STATE.splices = data.splices || [];
+  STATE.ctos = data.ctos || [];
+
+  (data.olts || []).forEach(o => {
+    o.layer = createPOPMarker(o);
+    STATE.olts.push(o);
+  });
+
+  (data.cables || []).forEach(c => {
+    STATE.cables.push(c);
+    if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
+  });
+}
+
+/** Tenta carregar da nuvem; se falhar, cai para o LocalStorage */
+async function loadFromCloud() {
+  try {
+    if (typeof supabase !== 'undefined') {
+      const { data, error } = await supabase
+        .from('ftth_projects')
+        .select('data')
+        .eq('id', 1)
+        .single();
+        
+      if (!error && data && data.data) {
+        console.log('☁️ Projeto carregado da Nuvem!');
+        applyDataToState(data.data);
+        return;
+      } else if (error && error.code !== 'PGRST116') {
+        console.warn('Falha ao ler da nuvem (ou tabela não existe), tentando backup local.', error);
+      }
+    }
+  } catch (err) {
+    console.error('Erro de rede na inicialização.', err);
+  }
+  
+  // Fallback Local
+  console.log('💻 Carregando backup do navegador (local)...');
+  loadLocal();
 }
 
 /** Carrega o estado do localStorage */
@@ -45,22 +114,9 @@ function loadLocal() {
 
   try {
     const data = JSON.parse(json);
-    document.getElementById('projectName').value = data.projectName || 'Meu Projeto de Rede';
-    STATE.nextOLTNum = data.nextOLTNum || 1;
-    STATE.splices = data.splices || [];
-    STATE.ctos = data.ctos || [];
-
-    (data.olts || []).forEach(o => {
-      o.layer = createPOPMarker(o);
-      STATE.olts.push(o);
-    });
-
-    (data.cables || []).forEach(c => {
-      STATE.cables.push(c);
-      if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
-    });
+    applyDataToState(data);
   } catch (e) {
-    console.error('Erro ao carregar:', e);
+    console.error('Erro ao carregar do localStorage:', e);
   }
 }
 
