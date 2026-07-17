@@ -42,8 +42,8 @@ function saveLocal() {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
     try {
-      if (typeof supabase === 'undefined') return;
-      const { error } = await supabase
+      if (typeof supabaseClient === 'undefined') return;
+      const { error } = await supabaseClient
         .from('ftth_projects')
         .upsert([{ id: 1, name: data.projectName, data: data, updated_at: new Date() }]);
       
@@ -83,8 +83,8 @@ function applyDataToState(data) {
 /** Tenta carregar da nuvem; se falhar, cai para o LocalStorage */
 async function loadFromCloud() {
   try {
-    if (typeof supabase !== 'undefined') {
-      const { data, error } = await supabase
+    if (typeof supabaseClient !== 'undefined') {
+      const { data, error } = await supabaseClient
         .from('ftth_projects')
         .select('data')
         .eq('id', 1)
