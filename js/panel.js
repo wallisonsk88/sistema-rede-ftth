@@ -444,7 +444,9 @@ function renderSpliceProps(splice) {
   
   let html = `
     <div class="panel-header">
-      <div style="font-size:14px; margin-bottom:5px;">🗃️ ${splice.name}</div>
+      <div style="font-size:14px; margin-bottom:5px; display:flex; align-items:center; gap:6px;">
+        <img src="img/ceo.svg" style="width:16px; height:16px;" alt="CEO"> ${splice.name}
+      </div>
       <div style="font-size:10px; opacity:0.8;">Painel de Fusão Kanban (Arrastar e Soltar)</div>
     </div>
     

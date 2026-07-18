@@ -14,7 +14,7 @@ const toolNames = {
 const toolHints = {
   pop:    '📍 Clique no mapa para posicionar o POP / OLT',
   cable:  '🔌 Clique num POP ou CEO para iniciar o cabo. Duplo-clique para terminar',
-  splice: '🗃️ Clique em cima de um cabo existente para inserir a Caixa de Emenda (CEO)',
+  splice: '<img src="img/ceo.svg" style="width:14px; height:14px; vertical-align:middle;" alt="CEO"> Clique em cima de um cabo existente para inserir a Caixa de Emenda (CEO)',
   ruler:  '📏 Clique para marcar pontos · Duplo-clique para finalizar',
   eraser: '🗑️ Clique em um elemento para apagá-lo',
 };

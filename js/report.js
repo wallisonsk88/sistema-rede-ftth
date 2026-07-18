@@ -62,7 +62,9 @@ function openReportModal() {
 
       <!-- CEO Card -->
       <div style="background:var(--surface2); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; align-items:center; gap:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
-        <div style="width:40px; height:40px; border-radius:10px; background:rgba(234, 179, 8, 0.15); display:flex; align-items:center; justify-content:center; font-size:20px; color:#eab308;">🗃️</div>
+        <div style="width:40px; height:40px; border-radius:10px; background:rgba(234, 179, 8, 0.15); display:flex; align-items:center; justify-content:center; font-size:20px; color:#eab308;">
+          <img src="img/ceo.svg" style="width:24px; height:24px; filter: brightness(0) saturate(100%) invert(74%) sepia(85%) saturate(1906%) hue-rotate(352deg) brightness(98%) contrast(93%);" alt="CEO">
+        </div>
         <div>
           <div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; margin-bottom:2px;">Total de CEOs</div>
           <div style="font-size:20px; font-weight:800; color:var(--text);">${data.totalCEOs} <span style="font-size:12px; font-weight:500; color:var(--text3);">unidades</span></div>
