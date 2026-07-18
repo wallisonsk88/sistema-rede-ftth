@@ -71,6 +71,22 @@ function renderProps() {
   const splice = STATE.splices.find(s => s.id === id);
   if (splice) return renderSpliceProps(splice);
 
+  // Verifica se é uma CTO
+  let ctoContext = null;
+  STATE.olts.forEach(pop => {
+    (pop.pons || []).forEach(pon => {
+      (pon.ramais || []).forEach(ramal => {
+        (ramal.ctos || []).forEach(cto => {
+          if (cto.id === id) {
+            ctoContext = { pop, pon, ramal, cto };
+          }
+        });
+      });
+    });
+  });
+  
+  if (ctoContext) return renderCTOProps(ctoContext.cto, ctoContext.pop, ctoContext.pon, ctoContext.ramal);
+
   return '';
 }
 
@@ -110,6 +126,12 @@ function renderPOPProps(pop) {
         <input class="fp-input" value="${pop.lat.toFixed(6)}" readonly>
         <input class="fp-input" value="${pop.lng.toFixed(6)}" readonly>
       </div>
+    </div>
+    
+    <div class="fp-group">
+      <label class="fp-label">Observações</label>
+      <textarea class="fp-input" style="height:60px; resize:vertical;" 
+        onchange="popUpdate('${pop.id}','obs',this.value)">${pop.obs || ''}</textarea>
     </div>
   </div>`;
 
@@ -468,6 +490,24 @@ function renderSpliceProps(splice) {
   const derivedCables = STATE.cables.filter(c => c.sourceType === 'splice' && c.sourceId === splice.id);
   
   let html = `
+    <div class="panel-section">
+      <div class="panel-section-title">
+        <img src="img/ceo.svg" style="width:16px; height:16px; margin-right:5px; vertical-align:middle;" alt="CEO"> CEO / Emenda
+      </div>
+      
+      <div class="fp-group">
+        <label class="fp-label">Nome da Caixa</label>
+        <input class="fp-input" value="${splice.name}"
+          onchange="updateSpliceField('${splice.id}','name',this.value)">
+      </div>
+      
+      <div class="fp-group">
+        <label class="fp-label">Observações</label>
+        <textarea class="fp-input" style="height:60px; resize:vertical;" 
+          onchange="updateSpliceField('${splice.id}','obs',this.value)">${splice.obs || ''}</textarea>
+      </div>
+    </div>
+
     <div class="panel-header">
       <div style="font-size:14px; margin-bottom:5px; display:flex; align-items:center; gap:6px;">
         <img src="img/ceo.svg" style="width:16px; height:16px;" alt="CEO"> ${splice.name}
@@ -618,4 +658,69 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
       toast('🔗 Matriz de fusão atualizada!');
       renderPanel();
    }
+}
+
+window.updateSpliceField = function(spliceId, field, value) {
+  const splice = STATE.splices.find(s => s.id === spliceId);
+  if (splice) {
+    splice[field] = value;
+    saveLocal();
+    // Atualiza tooltip no mapa
+    if (typeof renderAllSplices === 'function' && field === 'name') renderAllSplices();
+    renderPanel();
+  }
+}
+
+function renderCTOProps(cto, pop, pon, ramal) {
+  let html = `
+  <div class="panel-section">
+    <div class="panel-section-title">
+      📦 CTO (Caixa de Terminação)
+    </div>
+
+    <div style="font-size:11px; color:var(--text2); margin-bottom:15px;">
+      Hierarquia: <b>${pop.name}</b> ➡️ ${pon.rotaName} ➡️ ${ramal.name}
+    </div>
+
+    <div class="fp-group">
+      <label class="fp-label">Nome da CTO</label>
+      <input class="fp-input" value="${cto.name}"
+        onchange="updateCTOField('${pop.id}', '${pon.index}', '${ramal.id}', '${cto.id}', 'name', this.value)">
+    </div>
+
+    <div class="fp-row">
+      <div class="fp-group">
+        <label class="fp-label">Splitter</label>
+        <input class="fp-input" value="${cto.ratio}" readonly style="opacity:0.7">
+      </div>
+      <div class="fp-group">
+        <label class="fp-label">Sinal Estimado</label>
+        <input class="fp-input" value="${cto.sinalFinal ? cto.sinalFinal + ' dBm' : 'N/A'}" readonly style="opacity:0.7">
+      </div>
+    </div>
+
+    <div class="fp-group">
+      <label class="fp-label">Observações</label>
+      <textarea class="fp-input" style="height:60px; resize:vertical;" 
+        onchange="updateCTOField('${pop.id}', '${pon.index}', '${ramal.id}', '${cto.id}', 'obs', this.value)">${cto.obs || ''}</textarea>
+    </div>
+  </div>`;
+  return html;
+}
+
+window.updateCTOField = function(popId, ponIndex, ramalId, ctoId, field, value) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (!pop) return;
+  const pon = pop.pons.find(p => p.index === parseInt(ponIndex));
+  if (!pon) return;
+  const ramal = pon.ramais.find(r => r.id === ramalId);
+  if (!ramal) return;
+  const cto = ramal.ctos.find(c => c.id === ctoId);
+  if (cto) {
+    cto[field] = value;
+    saveLocal();
+    // Atualiza tooltip
+    if (typeof renderAllCTOMarkers === 'function' && field === 'name') renderAllCTOMarkers();
+    renderPanel();
+  }
 }

@@ -143,6 +143,11 @@ function renderAllCTOMarkers() {
               zIndexOffset: 500,
             });
 
+            m.on('click', () => {
+              setTool('select');
+              selectElement(cto.id);
+            });
+
             m.bindTooltip(`<b>${pop.name}</b><br>${pon.rotaName} - ${ramal.name}<br>${cto.name}<br>Splitter: ${cto.ratio}`, { direction: 'top', offset: [0, -10] });
 
             // Atualiza posição forçando Snap
