@@ -294,10 +294,10 @@ function highlightRamal(popId, ramalId) {
       });
       
       if (hasRamal) {
-        c.layer.setStyle({ color: '#f97316', weight: 6, opacity: 1, className: 'cable-flow' });
+        c.layer.setStyle({ color: '#f97316', weight: 6, opacity: 1, dashArray: '12, 12', className: 'cable-flow' });
         c.layer.bringToFront();
       } else {
-        c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.2, className: '' });
+        c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.2, dashArray: null, className: '' });
       }
     }
   });
@@ -306,7 +306,7 @@ function highlightRamal(popId, ramalId) {
 function clearHighlight() {
   STATE.cables.forEach(c => {
     if (c.layer) {
-      c.layer.setStyle({ color: '#cbd5e1', weight: 4, opacity: 0.9, className: '' });
+      c.layer.setStyle({ color: '#cbd5e1', weight: 4, opacity: 0.9, dashArray: null, className: '' });
     }
   });
 }
