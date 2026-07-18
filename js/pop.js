@@ -130,8 +130,6 @@ function removePonRota(popId, ponIndex) {
 
   pop.pons = pop.pons.filter(p => p.index !== ponIndex);
   
-  if (typeof syncPopCables === 'function') syncPopCables(popId);
-  
   saveLocal();
   renderPanel();
   toast('🗑️ Rota da PON ' + String(ponIndex).padStart(2, '0') + ' removida');
@@ -172,8 +170,6 @@ function addRamal(popId, ponIndex) {
     ctos: []
   });
   
-  if (typeof syncPopCables === 'function') syncPopCables(popId);
-  
   saveLocal();
   renderPanel();
   toast('🌿 Ramal adicionado à Rota');
@@ -187,8 +183,6 @@ function removeRamal(popId, ponIndex, ramalId) {
   if (!pon) return;
   
   pon.ramais = pon.ramais.filter(r => r.id !== ramalId);
-  
-  if (typeof syncPopCables === 'function') syncPopCables(popId);
   
   saveLocal();
   renderPanel();
