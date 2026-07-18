@@ -641,6 +641,7 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
   gap: 8px;
 }
 
+/* ============================================================
    RESPONSIVO (MOBILE)
    ============================================================ */
 @media (max-width: 768px) {
