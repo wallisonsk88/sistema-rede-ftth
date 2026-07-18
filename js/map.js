@@ -36,7 +36,7 @@ tiles.dark.addTo(map);
 let satActive = false;
 
 /** Alterna entre mapa escuro e satélite */
-function toggleSatellite() {
+window.toggleSatellite = function() {
   satActive = !satActive;
   if (satActive) {
     tiles.dark.remove();
@@ -50,9 +50,10 @@ function toggleSatellite() {
 }
 
 /** Ajusta o zoom para exibir todos os elementos */
-function fitBounds() {
+window.fitBounds = function() {
   const all = [];
   STATE.olts.forEach(o => all.push([o.lat, o.lng]));
+  STATE.splices.forEach(s => all.push([s.lat, s.lng]));
   if (all.length > 0) {
     map.fitBounds(L.latLngBounds(all), { padding: [40, 40] });
   }
