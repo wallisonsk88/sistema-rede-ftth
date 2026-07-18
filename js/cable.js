@@ -95,7 +95,12 @@ function finishCable() {
   // Renderiza no mapa
   renderCableOnMap(obj);
   
-  saveLocal();
+  if (currentCableSourceType === 'pop') {
+     if (typeof syncPopCables === 'function') syncPopCables(currentCableSourceId);
+  } else {
+     saveLocal();
+  }
+  
   setTool('select');
   selectElement(id);
   toast('✅ Cabo criado com sucesso!');
@@ -271,6 +276,41 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
       });
     }
   });
+}
+
+/** Auto-mapeia as fibras dos cabos tronco que saem do POP na mesma ordem dos ramais */
+window.syncPopCables = function(popId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (!pop) return;
+  
+  // Coleta todos os ramais criados no POP em ordem
+  let allRamais = [];
+  (pop.pons || []).forEach(pon => {
+    (pon.ramais || []).forEach(ramal => {
+       allRamais.push(ramal.id);
+    });
+  });
+
+  // Acha todos os cabos tronco que nascem deste POP
+  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === popId);
+  
+  rootCables.forEach(cable => {
+    for (let i = 1; i <= cable.fibers; i++) {
+       const ramalId = allRamais[i - 1]; // Índice do array começa no zero
+       
+       if (ramalId) {
+         cable.fiberMapping[i] = ramalId;
+       } else {
+         delete cable.fiberMapping[i];
+       }
+       
+       // Força a cascata para os cabos derivados deste tronco
+       if (typeof cascadeFiberMapping === 'function') {
+           cascadeFiberMapping(cable.id, i, ramalId);
+       }
+    }
+  });
+  saveLocal();
 }
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
