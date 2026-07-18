@@ -1,5 +1,5 @@
 /* ============================================================
-   RESET & VARIÃVEIS GLOBAIS
+   RESET & VARIÁVEIS GLOBAIS
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -717,11 +717,11 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
   .project-name-input { width: 130px; font-size: 12px; }
   
   .topbar-btn { padding: 8px; }
-  /* Oculta os textos dos botÃµes de aÃ§Ã£o e deixa sÃ³ o Ã­cone */
+  /* Oculta os textos dos botões de ação e deixa só o ícone */
   .topbar-btn { font-size: 16px; border:none; background: transparent; }
   .topbar-btn:hover { background: rgba(255,255,255,0.1); }
   .tb-text { display: none; }
-  /* Remove separator para poupar espaÃ§o */
+  /* Remove separator para poupar espaço */
   .topbar-sep { display: none; }
 
   /* WORKSPACE FLUXO (Coluna) */
@@ -753,7 +753,7 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
   /* PANEL DIREITO -> GAVETA LATERAL (Off-canvas) */
   .panel-right {
     position: fixed;
-    top: var(--topbar-h); /* ComeÃ§a abaixo do topbar */
+    top: var(--topbar-h); /* Começa abaixo do topbar */
     right: -100%; /* Totalmente fora da tela na direita */
     bottom: 60px; /* Acima da toolbar horizontal */
     width: 85vw; /* Ocupa 85% da largura da tela */
@@ -771,7 +771,7 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
     right: 0; /* Desliza para dentro */
   }
 
-  /* BotÃ£o de Fechar mobile (agora na lateral superior) */
+  /* Botão de Fechar mobile (agora na lateral superior) */
   .mobile-close-btn {
     display: flex !important;
     position: absolute;
@@ -786,7 +786,7 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
     z-index: 50;
   }
   
-  /* BotÃ£o HambÃºrguer Mobile */
+  /* Botão Hambúrguer Mobile */
   .mobile-hamburger-btn {
     display: flex !important;
     background: transparent;
