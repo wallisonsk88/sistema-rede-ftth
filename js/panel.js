@@ -294,11 +294,14 @@ function renderPOPProps(pop) {
 
   html += `</div>`;
 
-  // Botão remover POP
+  // Botões de ação do POP
   html += `
-  <button class="btn-full danger" onclick="deleteElement('${pop.id}')">
-    🗑️ Remover POP
-  </button>`;
+  <div style="margin-top:20px; display:flex; flex-direction:column; gap:8px;">
+    <button class="btn-full" style="background:var(--surface2);" onclick="clearHighlight()">🧹 Limpar Rastreamento</button>
+    <button class="btn-full danger" onclick="deleteElement('${pop.id}')">
+      🗑️ Remover POP
+    </button>
+  </div>`;
 
   return html;
 }
