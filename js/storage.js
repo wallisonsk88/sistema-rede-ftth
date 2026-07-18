@@ -92,6 +92,11 @@ function applyDataToState(data) {
     STATE.cables.push(c);
     if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
   });
+
+  // Força o auto-mapeamento para projetos já salvos antes da atualização
+  STATE.olts.forEach(o => {
+    if (typeof syncPopCables === 'function') syncPopCables(o.id);
+  });
 }
 
 /** Tenta carregar da nuvem; se falhar, cai para o LocalStorage */
