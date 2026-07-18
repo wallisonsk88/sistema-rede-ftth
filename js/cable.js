@@ -288,7 +288,8 @@ function highlightRamal(popId, ramalId) {
     if (c.layer) {
       // Se este cabo mapeia esse ramal em alguma fibra, pinta o cabo de azul/colorido, senão apaga um pouco
       let hasRamal = false;
-      Object.values(c.fiberMapping).forEach(rId => {
+      const mapping = c.fiberMapping || {};
+      Object.values(mapping).forEach(rId => {
         if (rId === ramalId) hasRamal = true;
       });
       
