@@ -32,6 +32,8 @@
     <button class="topbar-btn" onclick="exportProject()">💾 Salvar</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProject(event)">
     <button class="topbar-btn" onclick="document.getElementById('importFile').click()">📂 Abrir</button>
+    <div class="topbar-sep"></div>
+    <button class="topbar-btn" onclick="openReportModal()" style="background:var(--primary); color:white; border-color:var(--primary);">📊 Relatório</button>
   </header>
 
   <!-- ===================== WORKSPACE ===================== -->
@@ -106,6 +108,20 @@
   <!-- TOAST -->
   <div class="toast-wrap" id="toastWrap"></div>
 
+  <!-- MODAL RELATORIO -->
+  <div id="reportModal" class="report-modal-overlay" style="display:none;">
+    <div class="report-modal">
+      <div class="report-modal-header">
+        <h3>📊 Relatório de Quantitativo (BOM)</h3>
+        <button onclick="closeReportModal()">✕</button>
+      </div>
+      <div class="report-modal-body" id="reportContent"></div>
+      <div class="report-modal-footer">
+        <button class="btn-full" style="width:auto; margin:0;" onclick="copyReport()">Copiar para Área de Transferência</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===================== SCRIPTS ===================== -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
@@ -125,6 +141,7 @@
   <script src="js/ruler.js"></script>
   <script src="js/panel.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/report.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
