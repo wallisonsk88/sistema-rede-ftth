@@ -748,7 +748,7 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
   /* PANEL DIREITO -> BOTTOM SHEET GAVETA */
   .panel-right {
     position: absolute;
-    bottom: 60px; /* logo acima da toolbar */
+    bottom: -100%; /* Escondido totalmente fora da tela */
     left: 0;
     width: 100%;
     height: 60vh;
@@ -758,13 +758,12 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
     border-top-right-radius: 16px;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
     z-index: 2000;
-    transform: translateY(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
-  /* Quando o painel tiver um elemento selecionado, ele sobe (precisamos do JS para controlar isso, ou via classe) */
+  /* Quando o painel tiver um elemento selecionado, ele sobe */
   .panel-right.mobile-open {
-    transform: translateY(0);
+    bottom: 60px; /* Sobe até encostar no menu de ferramentas */
   }
 
   /* Fechar painel mobile */
