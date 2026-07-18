@@ -50,22 +50,28 @@ function openReportModal() {
   const data = generateReportData();
   
   let html = `
-    <table class="report-table">
-      <thead>
-        <tr>
-          <th>Item / Material</th>
-          <th style="text-align:right">Quantidade</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Caixas de Terminação Óptica (CTO)</strong></td>
-          <td style="text-align:right">${data.totalCTOs} un</td>
-        </tr>
-        <tr>
-          <td><strong>Caixas de Emenda Óptica (CEO)</strong></td>
-          <td style="text-align:right">${data.totalCEOs} un</td>
-        </tr>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+      <!-- CTO Card -->
+      <div style="background:var(--surface2); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; align-items:center; gap:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+        <div style="width:40px; height:40px; border-radius:10px; background:rgba(59, 130, 246, 0.15); display:flex; align-items:center; justify-content:center; font-size:20px; color:#3b82f6;">📦</div>
+        <div>
+          <div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; margin-bottom:2px;">Total de CTOs</div>
+          <div style="font-size:20px; font-weight:800; color:var(--text);">${data.totalCTOs} <span style="font-size:12px; font-weight:500; color:var(--text3);">unidades</span></div>
+        </div>
+      </div>
+
+      <!-- CEO Card -->
+      <div style="background:var(--surface2); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; align-items:center; gap:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+        <div style="width:40px; height:40px; border-radius:10px; background:rgba(234, 179, 8, 0.15); display:flex; align-items:center; justify-content:center; font-size:20px; color:#eab308;">🗃️</div>
+        <div>
+          <div style="font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; margin-bottom:2px;">Total de CEOs</div>
+          <div style="font-size:20px; font-weight:800; color:var(--text);">${data.totalCEOs} <span style="font-size:12px; font-weight:500; color:var(--text3);">unidades</span></div>
+        </div>
+      </div>
+    </div>
+    
+    <h4 style="margin:0 0 12px 0; font-size:13px; color:var(--text); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Metragem de Cabos</h4>
+    <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
   `;
 
   const cableTypes = Object.keys(data.cableLengths).sort((a,b) => parseInt(a) - parseInt(b));
@@ -74,33 +80,41 @@ function openReportModal() {
     cableTypes.forEach(fo => {
       const meters = data.cableLengths[fo];
       html += `
-        <tr>
-          <td>Cabo Óptico AS (Autossustentado) - <strong>${fo} FO</strong></td>
-          <td style="text-align:right">${meters.toFixed(1)} m</td>
-        </tr>
+        <div style="padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center; transition: background 0.2s; cursor:default;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:28px; height:28px; border-radius:8px; background:rgba(16, 185, 129, 0.15); color:#10b981; display:flex; align-items:center; justify-content:center; font-size:14px;">〰️</div>
+            <span style="font-size:13px; font-weight:600; color:var(--text);">Cabo AS <span style="color:var(--primary);">${fo} FO</span></span>
+          </div>
+          <div style="font-size:14px; font-weight:700; color:var(--text);">${meters.toFixed(1)} <span style="font-size:11px; font-weight:500; color:var(--text3);">metros</span></div>
+        </div>
       `;
     });
     
     html += `
-        <tr style="background:var(--surface2);">
-          <td><strong>Total Geral de Cabos</strong></td>
-          <td style="text-align:right; font-weight:700;">${data.totalCable.toFixed(1)} m</td>
-        </tr>
+        <div style="padding:16px; background:var(--surface2); display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:28px; height:28px; border-radius:8px; background:rgba(255, 255, 255, 0.1); color:white; display:flex; align-items:center; justify-content:center; font-size:14px;">📏</div>
+            <span style="font-size:13px; font-weight:700; color:var(--text);">Total Geral de Lançamento</span>
+          </div>
+          <div style="font-size:16px; font-weight:800; color:var(--green);">${data.totalCable.toFixed(1)} <span style="font-size:12px; font-weight:600; color:var(--text3);">metros</span></div>
+        </div>
     `;
   } else {
     html += `
-        <tr>
-          <td colspan="2" style="text-align:center; color:var(--text3);">Nenhum cabo lançado no mapa.</td>
-        </tr>
+        <div style="padding:30px 20px; text-align:center; color:var(--text3); font-size:13px;">
+          Nenhum cabo lançado no mapa.
+        </div>
     `;
   }
 
   html += `
-      </tbody>
-    </table>
-    <p style="font-size:11px; color:var(--text3); margin:0;">
-      <em>Nota: A metragem dos cabos é calculada com base nas coordenadas geográficas ponto a ponto no mapa (sem contar margens de sobra nos postes). Recomenda-se adicionar uma margem de segurança de 5% a 10% na hora da compra.</em>
-    </p>
+    </div>
+    <div style="display:flex; gap:8px; align-items:flex-start; padding:10px 12px; background:rgba(234, 179, 8, 0.08); border:1px solid rgba(234, 179, 8, 0.3); border-radius:8px;">
+      <span style="font-size:16px;">💡</span>
+      <p style="font-size:11px; color:var(--text2); margin:0; line-height:1.4;">
+        <strong style="color:var(--text);">Aviso de Cotação:</strong> A metragem é calculada geometricamente ponto a ponto. Recomenda-se adicionar <strong>5% a 10% de margem de sobra técnica</strong> (curvas, postes e reservas) na hora de comprar os cabos.
+      </p>
+    </div>
   `;
 
   document.getElementById('reportContent').innerHTML = html;
