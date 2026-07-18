@@ -315,11 +315,18 @@ window.syncPopCables = function(popId) {
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
 window.highlightRamal = function(popId, ramalId) {
+  // Se clicar na lupa do mesmo ramal já destacado, atua como um botão liga/desliga (toggle)
+  if (window.activeRamalTrace === ramalId) {
+    clearHighlight();
+    return;
+  }
+
   // Limpa traços anteriores
   if (window.activeTraceLines) {
     window.activeTraceLines.forEach(l => map.removeLayer(l));
   }
   window.activeTraceLines = [];
+  window.activeRamalTrace = ramalId; // Memoriza qual ramal está ativo
 
   // Encontra a cor correta da PON para este ramal
   let routeColor = '#f97316';
@@ -399,6 +406,7 @@ function clearHighlight() {
     window.activeTraceLines.forEach(l => map.removeLayer(l));
     window.activeTraceLines = [];
   }
+  window.activeRamalTrace = null;
   STATE.cables.forEach(c => {
     if (c.layer) {
       c.layer.setStyle({ color: '#cbd5e1', weight: 4, opacity: 0.9, dashArray: null, className: '' });
