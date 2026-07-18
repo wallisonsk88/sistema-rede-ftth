@@ -202,9 +202,43 @@ function setFiberMapping(cableId, fiberNumber, ramalId) {
     } else {
       delete cable.fiberMapping[fiberNumber];
     }
+    
+    // Propaga a mudança para cabos filhos conectados nas CEOs
+    cascadeFiberMapping(cableId, fiberNumber, ramalId);
+    
     saveLocal();
     renderPanel();
   }
+}
+
+/** Propaga a rota/ramal pela árvore de cabos usando as fusões nas CEOs (Recursivo) */
+function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
+  const splicesOnCable = STATE.splices.filter(s => s.cableId === cableId);
+  
+  splicesOnCable.forEach(splice => {
+    if (splice.fusions) {
+      Object.keys(splice.fusions).forEach(childCableId => {
+        const childCable = STATE.cables.find(c => c.id === childCableId);
+        if (childCable) {
+          Object.keys(splice.fusions[childCableId]).forEach(childFiberStr => {
+            const parentFiberNum = splice.fusions[childCableId][childFiberStr];
+            if (parentFiberNum == fiberNumber) {
+              const childFiberNum = parseInt(childFiberStr);
+              
+              if (ramalId) {
+                childCable.fiberMapping[childFiberNum] = ramalId;
+              } else {
+                delete childCable.fiberMapping[childFiberNum];
+              }
+              
+              // Continua propagando (cascata)
+              cascadeFiberMapping(childCableId, childFiberNum, ramalId);
+            }
+          });
+        }
+      });
+    }
+  });
 }
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
