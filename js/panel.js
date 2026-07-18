@@ -195,8 +195,11 @@ function renderPOPProps(pop) {
               let ramalHtml = `
               <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:6px; align-items:center;">
-                  <input type="text" value="${ramal.name}" style="background:transparent; border:none; color:var(--text); font-size:11px; font-weight:700; width:140px; padding:2px;" onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'name', this.value)">
-                  <button class="pon-remove-btn" onclick="removeRamal('${pop.id}', ${i}, '${ramal.id}')">✕</button>
+                  <input type="text" value="${ramal.name}" style="background:transparent; border:none; color:var(--text); font-size:11px; font-weight:700; width:120px; padding:2px;" onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'name', this.value)">
+                  <div style="display:flex; gap:4px;">
+                    <button class="pon-remove-btn" onclick="highlightRamal('${pop.id}', '${ramal.id}')" title="Rastrear Ramal no mapa" style="color:var(--primary);">🔍</button>
+                    <button class="pon-remove-btn" onclick="removeRamal('${pop.id}', ${i}, '${ramal.id}')" title="Excluir Ramal">✕</button>
+                  </div>
                 </div>
                 
                 <div class="pon-field-row" style="margin-bottom:8px;">
