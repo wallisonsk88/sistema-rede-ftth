@@ -293,9 +293,10 @@ function highlightRamal(popId, ramalId) {
       });
       
       if (hasRamal) {
-        c.layer.setStyle({ color: '#f97316', weight: 6, opacity: 1 });
+        c.layer.setStyle({ color: '#f97316', weight: 6, opacity: 1, className: 'cable-flow' });
+        c.layer.bringToFront();
       } else {
-        c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.4 });
+        c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.2, className: '' });
       }
     }
   });
@@ -304,7 +305,7 @@ function highlightRamal(popId, ramalId) {
 function clearHighlight() {
   STATE.cables.forEach(c => {
     if (c.layer) {
-      c.layer.setStyle({ color: '#cbd5e1', weight: 4, opacity: 0.9 });
+      c.layer.setStyle({ color: '#cbd5e1', weight: 4, opacity: 0.9, className: '' });
     }
   });
 }

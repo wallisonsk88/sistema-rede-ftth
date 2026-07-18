@@ -907,3 +907,16 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
 .mobile-close-btn { display: none; }
 .mobile-hamburger-btn { display: none; }
 
+/* ============================================================
+   ANIMAÇÃO DE FLUXO DE FIBRA
+   ============================================================ */
+@keyframes flow-anim {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+.cable-flow {
+  stroke-dasharray: 12, 12;
+  animation: flow-anim 1s linear infinite;
+  stroke-linecap: round;
+  z-index: 900;
+}
