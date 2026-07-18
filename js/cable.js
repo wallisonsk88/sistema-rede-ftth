@@ -147,6 +147,38 @@ function getDistanceAlongCable(latlng, cablePath) {
   return distToPt;
 }
 
+/** Corta o path do cabo até o ponto especificado e retorna um novo array de coordenadas */
+function slicePathTo(cablePath, latlng) {
+  const pt = map.latLngToLayerPoint(latlng);
+  let minDistanceSq = Infinity;
+  let closestLayerPt = null;
+  let closestSegmentIndex = 0;
+
+  for (let i = 0; i < cablePath.length - 1; i++) {
+    const p1 = map.latLngToLayerPoint(cablePath[i]);
+    const p2 = map.latLngToLayerPoint(cablePath[i + 1]);
+    
+    const projPt = getClosestPointOnSegment(pt, p1, p2);
+    const sqDist = dist2(pt, projPt);
+    
+    if (sqDist < minDistanceSq) {
+      minDistanceSq = sqDist;
+      closestLayerPt = projPt;
+      closestSegmentIndex = i;
+    }
+  }
+  
+  if (!closestLayerPt) return cablePath;
+  
+  const newPath = [];
+  for (let i = 0; i <= closestSegmentIndex; i++) {
+     newPath.push(cablePath[i]);
+  }
+  const snapLatLng = map.layerPointToLatLng(closestLayerPt);
+  newPath.push([snapLatLng.lat, snapLatLng.lng]);
+  return newPath;
+}
+
 /** Renderiza um cabo já salvo no estado */
 function renderCableOnMap(cableObj) {
   const pl = L.polyline(cableObj.path, {
@@ -243,8 +275,14 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
 window.highlightRamal = function(popId, ramalId) {
+  // Limpa traços anteriores
+  if (window.activeTraceLines) {
+    window.activeTraceLines.forEach(l => map.removeLayer(l));
+  }
+  window.activeTraceLines = [];
+
   // Encontra a cor correta da PON para este ramal
-  let routeColor = '#f97316'; // cor padrão se não achar
+  let routeColor = '#f97316';
   const pop = STATE.olts.find(o => o.id === popId);
   if (pop && pop.pons) {
     for (const pon of pop.pons) {
@@ -255,26 +293,72 @@ window.highlightRamal = function(popId, ramalId) {
     }
   }
 
-  // Reset de todos os cabos e aplica o destaque com a cor da PON
+  // Fade out em todos os cabos originais
   STATE.cables.forEach(c => {
     if (c.layer) {
-      let hasRamal = false;
+      c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.2, dashArray: null, className: '' });
+
+      // Encontra as fibras deste cabo que possuem este ramal
+      const fibersWithRamal = [];
       const mapping = c.fiberMapping || {};
-      Object.values(mapping).forEach(rId => {
-        if (rId === ramalId) hasRamal = true;
-      });
-      
-      if (hasRamal) {
-        c.layer.setStyle({ color: routeColor, weight: 6, opacity: 1, dashArray: '10, 15', className: 'cable-flow' });
-        c.layer.bringToFront();
-      } else {
-        c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.2, dashArray: null, className: '' });
+      for (let fNum in mapping) {
+         if (mapping[fNum] === ramalId) {
+            fibersWithRamal.push(parseInt(fNum));
+         }
+      }
+
+      if (fibersWithRamal.length > 0) {
+         // Pega CEOs no cabo
+         const cableSplices = STATE.splices
+            .filter(s => s.cableId === c.id)
+            .map(s => ({ ...s, dist: getDistanceAlongCable([s.lat, s.lng], c.path) }));
+         
+         fibersWithRamal.forEach(fNum => {
+            let earliestCutSplice = null;
+            let minCutDist = Infinity;
+
+            for (const sp of cableSplices) {
+               if (sp.fusions) {
+                  for (const dCId in sp.fusions) {
+                     for (const dFib in sp.fusions[dCId]) {
+                         if (sp.fusions[dCId][dFib] == fNum) {
+                             if (sp.dist < minCutDist) {
+                                minCutDist = sp.dist;
+                                earliestCutSplice = sp;
+                             }
+                         }
+                     }
+                  }
+               }
+            }
+
+            let pathTrace = c.path;
+            if (earliestCutSplice) {
+               pathTrace = slicePathTo(c.path, [earliestCutSplice.lat, earliestCutSplice.lng]);
+            }
+
+            // Cria a linha animada
+            const traceLine = L.polyline(pathTrace, {
+               color: routeColor, 
+               weight: 6, 
+               opacity: 1, 
+               dashArray: '10, 15', 
+               className: 'cable-flow',
+               interactive: false
+            }).addTo(map);
+            traceLine.bringToFront();
+            window.activeTraceLines.push(traceLine);
+         });
       }
     }
   });
 }
 
 function clearHighlight() {
+  if (window.activeTraceLines) {
+    window.activeTraceLines.forEach(l => map.removeLayer(l));
+    window.activeTraceLines = [];
+  }
   STATE.cables.forEach(c => {
     if (c.layer) {
       c.layer.setStyle({ color: '#cbd5e1', weight: 4, opacity: 0.9, dashArray: null, className: '' });
