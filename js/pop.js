@@ -39,10 +39,12 @@ function addPOP(lat, lng) {
 /** Cria o marcador visual do POP no mapa */
 function createPOPMarker(obj) {
   const icon = L.divIcon({
-    html: `<div class="olt-marker" id="mk_${obj.id}">🏢</div>
-           <div class="olt-label">${obj.name}</div>`,
+    html: `<div style="position:relative; width:40px; height:40px;">
+             <div class="olt-marker" id="mk_${obj.id}">🏢</div>
+             <div class="olt-label" id="pop_lbl_${obj.id}">${obj.name}</div>
+           </div>`,
     className: '',
-    iconSize: [40, 56],
+    iconSize: [40, 40],
     iconAnchor: [20, 20],
     popupAnchor: [0, -22],
   });
@@ -78,6 +80,13 @@ function popUpdate(id, key, val) {
   const pop = STATE.olts.find(o => o.id === id);
   if (pop) {
     pop[key] = val;
+    
+    // Atualiza imediatamente a etiqueta visual (DOM) se a propriedade for 'name'
+    if (key === 'name') {
+      const lbl = document.getElementById('pop_lbl_' + id);
+      if (lbl) lbl.textContent = val;
+    }
+    
     saveLocal();
     renderPanel();
   }

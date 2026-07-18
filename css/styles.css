@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    RESET & VARIÃVEIS GLOBAIS
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -356,6 +356,10 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
 .olt-marker:hover { transform: scale(1.1); }
 
 .olt-label {
+  position: absolute;
+  top: 45px;
+  left: 50%;
+  transform: translateX(-50%);
   background: rgba(11,17,32,0.9);
   border: 1px solid rgba(249,115,22,0.5);
   padding: 3px 8px;
@@ -364,8 +368,8 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
   font-weight: 700;
   color: #fdba74;
   white-space: nowrap;
-  margin-top: 2px;
   text-align: center;
+  z-index: 1000;
 }
 
 .distance-label {
