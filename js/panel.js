@@ -592,10 +592,27 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
    if (splice) {
       if (!splice.fusions) splice.fusions = {};
       if (!splice.fusions[destCableId]) splice.fusions[destCableId] = {};
+      
+      const parentCable = STATE.cables.find(c => c.id === splice.cableId);
+      const childCable = STATE.cables.find(c => c.id === destCableId);
+
       if (srcFiber) {
          splice.fusions[destCableId][destFiber] = parseInt(srcFiber);
+         
+         // Herdar Rota/Ramal automaticamente do cabo pai
+         if (parentCable && childCable) {
+            const ramalId = parentCable.fiberMapping[parseInt(srcFiber)];
+            if (ramalId) {
+               childCable.fiberMapping[destFiber] = ramalId;
+            }
+         }
       } else {
          delete splice.fusions[destCableId][destFiber];
+         
+         // Limpa a herança se desfazer a fusão
+         if (childCable) {
+            delete childCable.fiberMapping[destFiber];
+         }
       }
       saveLocal();
       toast('🔗 Matriz de fusão atualizada!');
