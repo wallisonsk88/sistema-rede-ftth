@@ -29,9 +29,10 @@
     <div class="topbar-spacer"></div>
 
     <button class="topbar-btn" onclick="clearAll()" title="Apagar projeto">🗑️ <span class="tb-text">Limpar</span></button>
-    <button class="topbar-btn" onclick="exportProject()">💾 <span class="tb-text">Salvar</span></button>
+    <button class="topbar-btn" onclick="exportProject()" title="Salvar projeto em arquivo JSON">💾 <span class="tb-text">Salvar</span></button>
+    <button class="topbar-btn" onclick="exportKMZ()" title="Exportar para Google Earth" style="color: #4ade80;">🌍 <span class="tb-text">KMZ</span></button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProject(event)">
-    <button class="topbar-btn" onclick="document.getElementById('importFile').click()">📂 <span class="tb-text">Abrir</span></button>
+    <button class="topbar-btn" onclick="document.getElementById('importFile').click()" title="Abrir projeto">📂 <span class="tb-text">Abrir</span></button>
     <div class="topbar-sep"></div>
     <button class="topbar-btn" onclick="openReportModal()" style="background:var(--primary); color:white; border-color:var(--primary);">📊 <span class="tb-text">Relatório</span></button>
     <button class="mobile-hamburger-btn" onclick="toggleMobilePanel()">☰</button>
@@ -129,6 +130,9 @@
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
+  <!-- JSZip para gerar arquivos KMZ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
   <!-- App JS (ordem importa!) -->
   <script src="js/supabase-client.js"></script>
   <script src="js/state.js"></script>
@@ -143,6 +147,7 @@
   <script src="js/ruler.js"></script>
   <script src="js/panel.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/kml_export.js"></script>
   <script src="js/report.js"></script>
   <script src="js/app.js"></script>
 </body>
