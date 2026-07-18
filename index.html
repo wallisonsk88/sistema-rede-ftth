@@ -28,12 +28,12 @@
     <input class="project-name-input" id="projectName" value="Meu Projeto de Rede" title="Clique para renomear">
     <div class="topbar-spacer"></div>
 
-    <button class="topbar-btn" onclick="clearAll()" title="Apagar projeto">🗑️ Limpar</button>
-    <button class="topbar-btn" onclick="exportProject()">💾 Salvar</button>
+    <button class="topbar-btn" onclick="clearAll()" title="Apagar projeto">🗑️ <span class="tb-text">Limpar</span></button>
+    <button class="topbar-btn" onclick="exportProject()">💾 <span class="tb-text">Salvar</span></button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProject(event)">
-    <button class="topbar-btn" onclick="document.getElementById('importFile').click()">📂 Abrir</button>
+    <button class="topbar-btn" onclick="document.getElementById('importFile').click()">📂 <span class="tb-text">Abrir</span></button>
     <div class="topbar-sep"></div>
-    <button class="topbar-btn" onclick="openReportModal()" style="background:var(--primary); color:white; border-color:var(--primary);">📊 Relatório</button>
+    <button class="topbar-btn" onclick="openReportModal()" style="background:var(--primary); color:white; border-color:var(--primary);">📊 <span class="tb-text">Relatório</span></button>
   </header>
 
   <!-- ===================== WORKSPACE ===================== -->
@@ -90,7 +90,8 @@
     </section>
 
     <!-- PANEL RIGHT -->
-    <aside class="panel-right">
+    <aside class="panel-right" id="panelRight">
+      <div class="mobile-close-btn" onclick="closeMobilePanel()">✕</div>
       <div class="panel-tabs">
         <div class="panel-tab active" id="tab-props" onclick="switchTab('props')">Propriedades</div>
       </div>

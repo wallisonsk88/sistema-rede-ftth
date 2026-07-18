@@ -21,6 +21,20 @@ function renderPanel() {
       body.innerHTML = '';
       break;
   }
+  
+  // Controle Mobile
+  const panel = document.getElementById('panelRight');
+  if (panel) {
+    if (STATE.selectedId) panel.classList.add('mobile-open');
+    else panel.classList.remove('mobile-open');
+  }
+}
+
+function closeMobilePanel() {
+  const panel = document.getElementById('panelRight');
+  if (panel) panel.classList.remove('mobile-open');
+  STATE.selectedId = null;
+  if (typeof updateSelectionStyle === 'function') updateSelectionStyle();
 }
 
 /** Renderiza o conteúdo da aba Propriedades */
