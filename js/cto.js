@@ -143,10 +143,7 @@ function renderAllCTOMarkers() {
               zIndexOffset: 500,
             });
 
-            m.on('click', () => {
-              setTool('select');
-              selectElement(cto.id);
-            });
+
 
             m.bindTooltip(`<b>${pop.name}</b><br>${pon.rotaName} - ${ramal.name}<br>${cto.name}<br>Splitter: ${cto.ratio}`, { direction: 'top', offset: [0, -10] });
 
@@ -178,12 +175,15 @@ function renderAllCTOMarkers() {
                 if (STATE.tool === 'eraser') {
                     ramal.ctos.splice(ctoIdx, 1);
                     ramal.ctos.forEach((c, i) => {
-                        c.name = 'CTO ' + String(i + 1).padStart(2, '0');
+                        c.name = `CTO ${String(i + 1).padStart(2, '0')}`;
                     });
                     saveLocal();
                     renderAllCTOMarkers();
-                    if (STATE.selectedId === pop.id) renderPanel();
-                    toast(`🗑️ CTO removida da rota!`);
+                    renderPanel();
+                    toast('CTO removida!');
+                } else {
+                    setTool('select');
+                    selectElement(cto.id);
                 }
             });
 
