@@ -641,72 +641,167 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
   gap: 8px;
 }
 
- / *   M O D A L   R E L A T O R I O   * / 
- . r e p o r t - m o d a l - o v e r l a y   { 
-     p o s i t i o n :   f i x e d ; 
-     t o p :   0 ;   l e f t :   0 ;   w i d t h :   1 0 0 v w ;   h e i g h t :   1 0 0 v h ; 
-     b a c k g r o u n d :   r g b a ( 0 , 0 , 0 , 0 . 6 ) ; 
-     b a c k d r o p - f i l t e r :   b l u r ( 4 p x ) ; 
-     z - i n d e x :   9 9 9 9 ; 
-     d i s p l a y :   f l e x ; 
-     a l i g n - i t e m s :   c e n t e r ; 
-     j u s t i f y - c o n t e n t :   c e n t e r ; 
- } 
- . r e p o r t - m o d a l   { 
-     b a c k g r o u n d :   v a r ( - - b g ) ; 
-     w i d t h :   9 0 % ; 
-     m a x - w i d t h :   6 0 0 p x ; 
-     b o r d e r - r a d i u s :   1 2 p x ; 
-     b o r d e r :   1 p x   s o l i d   v a r ( - - b o r d e r ) ; 
-     b o x - s h a d o w :   0   1 0 p x   3 0 p x   r g b a ( 0 , 0 , 0 , 0 . 3 ) ; 
-     d i s p l a y :   f l e x ; 
-     f l e x - d i r e c t i o n :   c o l u m n ; 
-     m a x - h e i g h t :   9 0 v h ; 
- } 
- . r e p o r t - m o d a l - h e a d e r   { 
-     p a d d i n g :   1 6 p x   2 0 p x ; 
-     b o r d e r - b o t t o m :   1 p x   s o l i d   v a r ( - - b o r d e r ) ; 
-     d i s p l a y :   f l e x ; 
-     j u s t i f y - c o n t e n t :   s p a c e - b e t w e e n ; 
-     a l i g n - i t e m s :   c e n t e r ; 
- } 
- . r e p o r t - m o d a l - h e a d e r   h 3   {   m a r g i n :   0 ;   f o n t - s i z e :   1 6 p x ;   c o l o r :   v a r ( - - t e x t ) ;   } 
- . r e p o r t - m o d a l - h e a d e r   b u t t o n   { 
-     b a c k g r o u n d :   t r a n s p a r e n t ;   b o r d e r :   n o n e ;   c o l o r :   v a r ( - - t e x t 2 ) ; 
-     f o n t - s i z e :   1 6 p x ;   c u r s o r :   p o i n t e r ; 
- } 
- . r e p o r t - m o d a l - h e a d e r   b u t t o n : h o v e r   {   c o l o r :   v a r ( - - r e d ) ;   } 
- . r e p o r t - m o d a l - b o d y   { 
-     p a d d i n g :   2 0 p x ; 
-     o v e r f l o w - y :   a u t o ; 
-     f o n t - s i z e :   1 3 p x ; 
-     c o l o r :   v a r ( - - t e x t 2 ) ; 
- } 
- . r e p o r t - m o d a l - f o o t e r   { 
-     p a d d i n g :   1 6 p x   2 0 p x ; 
-     b o r d e r - t o p :   1 p x   s o l i d   v a r ( - - b o r d e r ) ; 
-     d i s p l a y :   f l e x ; 
-     j u s t i f y - c o n t e n t :   f l e x - e n d ; 
- } 
- . r e p o r t - t a b l e   { 
-     w i d t h :   1 0 0 % ; 
-     b o r d e r - c o l l a p s e :   c o l l a p s e ; 
-     m a r g i n - b o t t o m :   2 0 p x ; 
- } 
- . r e p o r t - t a b l e   t h ,   . r e p o r t - t a b l e   t d   { 
-     p a d d i n g :   1 0 p x ; 
-     b o r d e r - b o t t o m :   1 p x   s o l i d   v a r ( - - b o r d e r ) ; 
-     t e x t - a l i g n :   l e f t ; 
- } 
- . r e p o r t - t a b l e   t h   { 
-     c o l o r :   v a r ( - - t e x t ) ; 
-     f o n t - w e i g h t :   6 0 0 ; 
-     b a c k g r o u n d :   v a r ( - - s u r f a c e 2 ) ; 
- } 
- . r e p o r t - t a b l e   t r : l a s t - c h i l d   t d   {   b o r d e r - b o t t o m :   n o n e ;   } 
- 
- 
- 
+   RESPONSIVO (MOBILE)
+   ============================================================ */
+@media (max-width: 768px) {
+  /* TOPBAR */
+  .logo { font-size: 14px; gap: 5px; }
+  .logo-icon { width: 26px; height: 26px; font-size: 14px; }
+  .project-name-input { width: 130px; font-size: 12px; }
+  
+  .topbar-btn { padding: 8px; }
+  /* Oculta os textos dos botões de ação e deixa só o ícone */
+  .topbar-btn { font-size: 16px; border:none; background: transparent; }
+  .topbar-btn:hover { background: rgba(255,255,255,0.1); }
+  .tb-text { display: none; }
+  /* Remove separator para poupar espaço */
+  .topbar-sep { display: none; }
+
+  /* WORKSPACE FLUXO (Coluna) */
+  .workspace { flex-direction: column; position: relative; }
+
+  /* TOOLBAR (Base Horizontal) */
+  .toolbar {
+    width: 100%;
+    height: 60px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    padding: 0 10px;
+    justify-content: space-around;
+    align-items: center;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+  }
+  .tool-group-sep { width: 1px; height: 30px; margin: 0 5px; }
+  
+  .tool-btn { width: 45px; height: 45px; }
+  .tool-btn::after { display: none !important; } /* sem tooltip no touch */
+
+  /* MAPA */
+  #map { width: 100%; height: calc(100vh - var(--topbar-h) - 60px); flex: none; }
+
+  /* PANEL DIREITO -> GAVETA LATERAL (Off-canvas) */
+  .panel-right {
+    position: fixed;
+    top: var(--topbar-h); /* Começa abaixo do topbar */
+    right: -100%; /* Totalmente fora da tela na direita */
+    bottom: 60px; /* Acima da toolbar horizontal */
+    width: 85vw; /* Ocupa 85% da largura da tela */
+    height: auto;
+    border-left: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.7);
+    z-index: 2000;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Quando aberto */
+  .panel-right.mobile-open {
+    right: 0; /* Desliza para dentro */
+  }
+
+  /* Botão de Fechar mobile (agora na lateral superior) */
+  .mobile-close-btn {
+    display: flex !important;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    width: 30px; height: 30px;
+    align-items: center; justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 50;
+  }
+  
+  /* Botão Hambúrguer Mobile */
+  .mobile-hamburger-btn {
+    display: flex !important;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 5px;
+  }
+}
+
+/* Esconde no Desktop */
+.mobile-close-btn { display: none; }
+.mobile-hamburger-btn { display: none; }
+
+
+/* ============================================================
+   MODAL RELATORIO
+   ============================================================ */
+.report-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.report-modal {
+  background: var(--bg);
+  width: 90%;
+  max-width: 600px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.report-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.report-modal-header h3 { margin: 0; font-size: 16px; color: var(--text); }
+.report-modal-header button {
+  background: transparent; border: none; color: var(--text2);
+  font-size: 16px; cursor: pointer;
+}
+.report-modal-header button:hover { color: var(--red); }
+.report-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  font-size: 13px;
+  color: var(--text2);
+}
+.report-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+.report-table th, .report-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.report-table th {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--surface2);
+}
+.report-table tr:last-child td { border-bottom: none; }
+
 /* ============================================================
    RESPONSIVO (MOBILE)
    ============================================================ */
