@@ -40,14 +40,16 @@ function startCableExt(sourceType, sourceId, lat, lng) {
   currentCablePolyline = L.polyline(currentCablePoints, {
     color: '#38bdf8', // Azul claro chamativo para o desenho
     weight: 4,
-    opacity: 0.9
+    opacity: 0.9,
+    interactive: false
   }).addTo(map);
 
   currentCableCursorLine = L.polyline([], {
     color: '#38bdf8',
     weight: 4,
     dashArray: '5, 10',
-    opacity: 0.6
+    opacity: 0.6,
+    interactive: false
   }).addTo(map);
 
   map.on('mousemove', onCableMouseMove);
