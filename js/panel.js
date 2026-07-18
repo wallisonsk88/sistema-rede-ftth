@@ -37,6 +37,17 @@ function closeMobilePanel() {
   if (typeof updateSelectionStyle === 'function') updateSelectionStyle();
 }
 
+function toggleMobilePanel() {
+  const panel = document.getElementById('panelRight');
+  if (panel) {
+    if (panel.classList.contains('mobile-open')) {
+      closeMobilePanel();
+    } else {
+      panel.classList.add('mobile-open');
+    }
+  }
+}
+
 /** Renderiza o conteúdo da aba Propriedades */
 function renderProps() {
   const id = STATE.selectedId;
