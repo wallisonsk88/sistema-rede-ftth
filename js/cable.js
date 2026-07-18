@@ -242,11 +242,22 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
 }
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
-function highlightRamal(popId, ramalId) {
-  // Reset de todos os cabos
+window.highlightRamal = function(popId, ramalId) {
+  // Encontra a cor correta da PON para este ramal
+  let routeColor = '#f97316'; // cor padrão se não achar
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (pop && pop.pons) {
+    for (const pon of pop.pons) {
+      if (pon.ramais && pon.ramais.some(r => r.id === ramalId)) {
+        routeColor = pon.color || '#f97316';
+        break;
+      }
+    }
+  }
+
+  // Reset de todos os cabos e aplica o destaque com a cor da PON
   STATE.cables.forEach(c => {
     if (c.layer) {
-      // Se este cabo mapeia esse ramal em alguma fibra, pinta o cabo de azul/colorido, senão apaga um pouco
       let hasRamal = false;
       const mapping = c.fiberMapping || {};
       Object.values(mapping).forEach(rId => {
@@ -254,7 +265,7 @@ function highlightRamal(popId, ramalId) {
       });
       
       if (hasRamal) {
-        c.layer.setStyle({ color: '#f97316', weight: 6, opacity: 1, dashArray: '12, 12', className: 'cable-flow' });
+        c.layer.setStyle({ color: routeColor, weight: 6, opacity: 1, dashArray: '10, 15', className: 'cable-flow' });
         c.layer.bringToFront();
       } else {
         c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.2, dashArray: null, className: '' });
