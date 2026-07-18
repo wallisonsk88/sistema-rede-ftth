@@ -478,6 +478,56 @@ body.drawing .leaflet-container { cursor: crosshair !important; }
   50%      { box-shadow: 0 0 0 8px rgba(59,130,246,0.15); }
 }
 
+/* ============================================================
+   MODAL RELATORIO
+   ============================================================ */
+.report-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.report-modal {
+  background: var(--bg);
+  width: 90%;
+  max-width: 600px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.report-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.report-modal-header h3 { margin: 0; font-size: 16px; color: var(--text); }
+.report-modal-header button {
+  background: transparent; border: none; color: var(--text2);
+  font-size: 16px; cursor: pointer;
+}
+.report-modal-header button:hover { color: var(--red); }
+.report-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  font-size: 13px;
+  color: var(--text2);
+}
+.report-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* Empty state */
 .empty-panel {
   text-align: center;
