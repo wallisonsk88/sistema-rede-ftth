@@ -1,5 +1,5 @@
-/**
- * panel.js — Renderização do painel lateral direito
+﻿/**
+ * panel.js â€” RenderizaÃ§Ã£o do painel lateral direito
  */
 
 /** Troca a aba ativa do painel */
@@ -10,7 +10,7 @@ function switchTab(tab) {
   renderPanel();
 }
 
-/** Renderiza o conteúdo do painel com base na aba ativa */
+/** Renderiza o conteÃºdo do painel com base na aba ativa */
 function renderPanel() {
   const body = document.getElementById('panelBody');
   switch (STATE.activeTab) {
@@ -48,16 +48,16 @@ function toggleMobilePanel() {
   }
 }
 
-/** Renderiza o conteúdo da aba Propriedades */
+/** Renderiza o conteÃºdo da aba Propriedades */
 function renderProps() {
   const id = STATE.selectedId;
 
   if (!id) {
     return `<div class="empty-panel">
-      <div class="ep-icon">🖱️</div>
+      <div class="ep-icon">ðŸ–±ï¸</div>
       <div class="ep-text">
         Selecione um elemento no mapa para ver suas propriedades.<br><br>
-        <strong>Use a ferramenta POP</strong> na barra lateral para colocar um ponto de presença no mapa.
+        <strong>Use a ferramenta POP</strong> na barra lateral para colocar um ponto de presenÃ§a no mapa.
       </div>
     </div>`;
   }
@@ -81,7 +81,7 @@ function renderPOPProps(pop) {
 
   let html = `
   <div class="panel-section">
-    <div class="panel-section-title">🏢 POP / OLT</div>
+    <div class="panel-section-title">ðŸ¢ POP / OLT</div>
 
     <div class="fp-group">
       <label class="fp-label">Nome</label>
@@ -97,7 +97,7 @@ function renderPOPProps(pop) {
           onchange="popUpdate('${pop.id}','ponPorts',parseInt(this.value))">
       </div>
       <div class="fp-group">
-        <label class="fp-label">Potência TX (dBm)</label>
+        <label class="fp-label">PotÃªncia TX (dBm)</label>
         <input class="fp-input" type="number" step=".5"
           value="${pop.outputPower || 4}"
           onchange="popUpdate('${pop.id}','outputPower',parseFloat(this.value))">
@@ -114,12 +114,12 @@ function renderPOPProps(pop) {
   </div>`;
 
   // ============================================================
-  //  SEÇÃO DE PORTAS PON / ROTAS
+  //  SEÃ‡ÃƒO DE PORTAS PON / ROTAS
   // ============================================================
   html += `
   <div class="panel-section">
     <div class="panel-section-title">
-      🔌 Portas PON — Rotas
+      ðŸ”Œ Portas PON â€” Rotas
       <span style="float:right; font-size:10px; color:var(--text2); text-transform:none; letter-spacing:0">
         ${configuredCount} / ${totalPons} configuradas
       </span>
@@ -129,7 +129,7 @@ function renderPOPProps(pop) {
     const pon = pop.pons ? pop.pons.find(p => p.index === i) : null;
 
     if (pon) {
-      // ── PON CONFIGURADA ──
+      // â”€â”€ PON CONFIGURADA â”€â”€
       html += `
       <div class="pon-card configured">
         <div class="pon-color-bar" style="background:${pon.color}"></div>
@@ -138,7 +138,7 @@ function renderPOPProps(pop) {
             <span class="pon-badge" style="background:${pon.color}20; color:${pon.color}; border:1px solid ${pon.color}44">
               PON ${String(i).padStart(2, '0')}
             </span>
-            <button class="pon-remove-btn" onclick="removePonRota('${pop.id}', ${i})" title="Liberar porta">✕</button>
+            <button class="pon-remove-btn" onclick="removePonRota('${pop.id}', ${i})" title="Liberar porta">âœ•</button>
           </div>
           <div class="pon-field">
             <label>Nome da Rota</label>
@@ -160,7 +160,7 @@ function renderPOPProps(pop) {
           <!-- INICIO RAMAIS -->
           <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-              <span style="font-size:10px; font-weight:700; color:var(--text3)">🌿 RAMAIS (DISTRIBUIÇÃO)</span>
+              <span style="font-size:10px; font-weight:700; color:var(--text3)">ðŸŒ¿ RAMAIS (DISTRIBUIÃ‡ÃƒO)</span>
               <button class="pon-remove-btn" style="font-size:10px; color:var(--primary); font-weight:600;" onclick="addRamal('${pop.id}', ${i})">+ Adicionar Ramal</button>
             </div>
             
@@ -174,7 +174,7 @@ function renderPOPProps(pop) {
               <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:6px; align-items:center;">
                   <input type="text" value="${ramal.name}" style="background:transparent; border:none; color:var(--text); font-size:11px; font-weight:700; width:140px; padding:2px;" onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'name', this.value)">
-                  <button class="pon-remove-btn" onclick="removeRamal('${pop.id}', ${i}, '${ramal.id}')">✕</button>
+                  <button class="pon-remove-btn" onclick="removeRamal('${pop.id}', ${i}, '${ramal.id}')">âœ•</button>
                 </div>
                 
                 <div class="pon-field-row" style="margin-bottom:8px;">
@@ -199,14 +199,14 @@ function renderPOPProps(pop) {
                     <label>Quantidade de CTOs</label>
                     <input type="number" min="1" max="32" id="qtde_cto_${ramal.id}" placeholder="Ex: 5" value="${ramal.ctos ? ramal.ctos.length : ''}">
                   </div>
-                  <button class="btn-full primary" style="flex:1; margin-bottom:0;" onclick="generateRamalCTOs('${pop.id}', ${i}, '${ramal.id}', parseInt(document.getElementById('qtde_cto_${ramal.id}').value))">🪄 Gerar / Calcular</button>
+                  <button class="btn-full primary" style="flex:1; margin-bottom:0;" onclick="generateRamalCTOs('${pop.id}', ${i}, '${ramal.id}', parseInt(document.getElementById('qtde_cto_${ramal.id}').value))">ðŸª„ Gerar / Calcular</button>
                 </div>
               `;
               
               if(ramal.ctos && ramal.ctos.length > 0) {
                  ramalHtml += `<div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
                    <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px;">
-                     📦 CTOs Lançadas no Mapa: ${ramal.ctos.filter(c => c.lat).length} / ${ramal.ctos.length}
+                     ðŸ“¦ CTOs LanÃ§adas no Mapa: ${ramal.ctos.filter(c => c.lat).length} / ${ramal.ctos.length}
                    </div>
                    <div style="font-size:9px; color:var(--text2); display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; gap:4px;">
                      <span style="flex:1">CTO</span>
@@ -255,13 +255,13 @@ function renderPOPProps(pop) {
         </div>
       </div>`;
     } else {
-      // ── PON LIVRE ──
+      // â”€â”€ PON LIVRE â”€â”€
       html += `
       <div class="pon-card free" onclick="addPonRota('${pop.id}', ${i})">
         <div class="pon-color-bar" style="background:var(--border)"></div>
         <div class="pon-content">
           <span class="pon-badge free-badge">PON ${String(i).padStart(2, '0')}</span>
-          <span class="pon-free-text">Livre — clique para configurar rota</span>
+          <span class="pon-free-text">Livre â€” clique para configurar rota</span>
         </div>
       </div>`;
     }
@@ -269,17 +269,17 @@ function renderPOPProps(pop) {
 
   html += `</div>`;
 
-  // Botão remover POP
+  // BotÃ£o remover POP
   html += `
   <button class="btn-full danger" onclick="deleteElement('${pop.id}')">
-    🗑️ Remover POP
+    ðŸ—‘ï¸ Remover POP
   </button>`;
 
   return html;
 }
 
 // ================================================================
-//  SELEÇÃO E DELEÇÃO
+//  SELEÃ‡ÃƒO E DELEÃ‡ÃƒO
 // ================================================================
 
 /** Lida com o clique em um elemento do mapa */
@@ -304,7 +304,7 @@ function deleteElement(id) {
   if (pop) {
     map.removeLayer(pop.layer);
     STATE.olts = STATE.olts.filter(o => o.id !== id);
-    toast('🗑️ POP removido');
+    toast('ðŸ—‘ï¸ POP removido');
   }
 
   if (STATE.selectedId === id) STATE.selectedId = null;
@@ -366,7 +366,7 @@ function renderCableProps(cable) {
     </div>
     
     <hr style="border:0; border-top:1px dashed var(--border); margin:15px 0;">
-    <h3 style="margin-bottom:10px; font-size:12px; color:var(--text); text-transform:uppercase;">Alocação de Fibras</h3>
+    <h3 style="margin-bottom:10px; font-size:12px; color:var(--text); text-transform:uppercase;">AlocaÃ§Ã£o de Fibras</h3>
   `;
   
   html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
@@ -377,7 +377,7 @@ function renderCableProps(cable) {
     clickDist = getDistanceAlongCable(STATE.clickedLatLng, cable.path);
   }
 
-  // Busca CEOs conectadas a este cabo e pre-calcula distâncias
+  // Busca CEOs conectadas a este cabo e pre-calcula distÃ¢ncias
   const cableSplices = STATE.splices
     .filter(s => s.cableId === cable.id)
     .map(s => ({ ...s, dist: getDistanceAlongCable([s.lat, s.lng], cable.path) }));
@@ -405,18 +405,18 @@ function renderCableProps(cable) {
        }
     }
 
-    // A fibra morre 1 metro após a CEO.
+    // A fibra morre 1 metro apÃ³s a CEO.
     let isDeadAtClick = earliestCutSplice && (clickDist > minCutDist + 1);
 
     if (isDeadAtClick) {
-      // Fibra morta (após a CEO) - SEM SELECTOR DE RAMAL
+      // Fibra morta (apÃ³s a CEO) - SEM SELECTOR DE RAMAL
       html += `
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid #dc2626; opacity:0.8;">
           <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
           <div style="flex:1;">
             <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
             <div style="width:100%; font-size:11px; padding:4px; background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.4); color:#ef4444; border-radius:4px;">
-              ✂️ Cortada (Sangria na ${earliestCutSplice.name})
+              âœ‚ï¸ Cortada (Sangria na ${earliestCutSplice.name})
             </div>
           </div>
           <div style="width:52px"></div>
@@ -441,8 +441,8 @@ function renderCableProps(cable) {
           </div>
           ${mappedRamalId && rootPopId ? `
             <div style="display:flex;">
-              <button onclick="highlightRamal('${rootPopId}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">🔍</button>
-              <button onclick="preparePlaceCTO('${rootPopId}', '${mappedRamalId}', '${cable.id}')" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
+              <button onclick="highlightRamal('${rootPopId}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">ðŸ”</button>
+              <button onclick="preparePlaceCTO('${rootPopId}', '${mappedRamalId}', '${cable.id}')" title="LanÃ§ar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">ðŸ“¦</button>
             </div>
           ` : `<div style="width:52px"></div>`}
         </div>
@@ -454,7 +454,7 @@ function renderCableProps(cable) {
   
   html += `
     <div style="margin-top:15px;">
-      <button class="btn-full" onclick="clearHighlight()">🧹 Limpar Destaques</button>
+      <button class="btn-full" onclick="clearHighlight()">ðŸ§¹ Limpar Destaques</button>
     </div>
   `;
 
@@ -472,17 +472,17 @@ function renderSpliceProps(splice) {
       <div style="font-size:14px; margin-bottom:5px; display:flex; align-items:center; gap:6px;">
         <img src="img/ceo.svg" style="width:16px; height:16px;" alt="CEO"> ${splice.name}
       </div>
-      <div style="font-size:10px; opacity:0.8;">Painel de Fusão Kanban (Arrastar e Soltar)</div>
+      <div style="font-size:10px; opacity:0.8;">Painel de FusÃ£o Kanban (Arrastar e Soltar)</div>
     </div>
     
     <div style="padding:15px;">
       <button class="btn-full primary" style="margin-bottom:15px;" onclick="startCableFromSplice('${splice.id}')">
-        🔌 Lançar Cabo Derivado
+        ðŸ”Œ LanÃ§ar Cabo Derivado
       </button>
   `;
 
   if (derivedCables.length === 0) {
-      html += `<div style="font-size:11px; color:var(--text2); text-align:center; padding:20px;">Nenhum cabo derivado ainda. Lance um cabo derivado para começar a fusão.</div></div>`;
+      html += `<div style="font-size:11px; color:var(--text2); text-align:center; padding:20px;">Nenhum cabo derivado ainda. Lance um cabo derivado para comeÃ§ar a fusÃ£o.</div></div>`;
       return html;
   }
 
@@ -490,7 +490,7 @@ function renderSpliceProps(splice) {
   derivedCables.forEach(dc => {
     html += `
       <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; margin-bottom:15px; padding:10px;">
-        <div style="text-align:center; font-size:11px; font-weight:bold; margin-bottom:10px; color:var(--text);">Fusão: ${sourceCable ? sourceCable.name : 'Tronco'} ➡️ ${dc.name}</div>
+        <div style="text-align:center; font-size:11px; font-weight:bold; margin-bottom:10px; color:var(--text);">FusÃ£o: ${sourceCable ? sourceCable.name : 'Tronco'} âž¡ï¸ ${dc.name}</div>
         <div style="display:flex; gap:10px;">
           
           <!-- Left Column (Trunk Fibers) -->
@@ -539,13 +539,13 @@ function renderSpliceProps(splice) {
        if (currentSrcFiber) {
            const srcFColor = FIBER_COLORS[(currentSrcFiber-1) % FIBER_COLORS.length];
            html += `
-             <div style="padding:6px; border-radius:4px; border:1px solid #3b82f6; background:rgba(59, 130, 246, 0.15); display:flex; justify-content:space-between; align-items:center;">
+             <div style="padding:6px; border-radius:4px; border:1px solid #f97316; background:rgba(249, 115, 22, 0.15); display:flex; justify-content:space-between; align-items:center;">
                <div style="display:flex; align-items:center; gap:4px;">
                  <div style="width:8px; height:8px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
-                 <span style="font-size:10px; font-weight:bold; color:#60a5fa;">F${currentSrcFiber} ➡️ F${i}</span>
+                 <span style="font-size:10px; font-weight:bold; color:#60a5fa;">F${currentSrcFiber} âž¡ï¸ F${i}</span>
                  <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
                </div>
-               <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer Fusão">✖</button>
+               <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer FusÃ£o">âœ–</button>
              </div>
            `;
        } else {
@@ -566,7 +566,7 @@ function renderSpliceProps(splice) {
   return html;
 }
 
-// Funções de Arrastar e Soltar (Kanban)
+// FunÃ§Ãµes de Arrastar e Soltar (Kanban)
 window.dragFiber = function(ev, srcFiberIndex) {
   ev.dataTransfer.setData("srcFiber", srcFiberIndex);
 }
@@ -598,7 +598,7 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
          delete splice.fusions[destCableId][destFiber];
       }
       saveLocal();
-      toast('🔗 Matriz de fusão atualizada!');
+      toast('ðŸ”— Matriz de fusÃ£o atualizada!');
       renderPanel();
    }
 }

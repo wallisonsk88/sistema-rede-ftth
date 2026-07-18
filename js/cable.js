@@ -217,7 +217,7 @@ function highlightRamal(popId, ramalId) {
       });
       
       if (hasRamal) {
-        c.layer.setStyle({ color: '#3b82f6', weight: 6, opacity: 1 });
+        c.layer.setStyle({ color: '#f97316', weight: 6, opacity: 1 });
       } else {
         c.layer.setStyle({ color: '#475569', weight: 4, opacity: 0.4 });
       }
