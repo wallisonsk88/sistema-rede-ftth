@@ -106,7 +106,6 @@ function addPonRota(popId, ponIndex) {
     index: ponIndex,
     rotaName: 'Rota ' + ponIndex,
     color: nextColor.hex,
-    fibers: 12,
     ramais: [],
   });
 

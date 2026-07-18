@@ -130,14 +130,6 @@ function renderPOPProps(pop) {
                 ).join('')}
               </select>
             </div>
-            <div class="pon-field" style="flex:1">
-              <label>Fibras</label>
-              <select onchange="updatePonRota('${pop.id}', ${i}, 'fibers', parseInt(this.value))">
-                ${[2, 4, 6, 12, 24, 36, 48, 72].map(f =>
-                  `<option value="${f}" ${pon.fibers === f ? 'selected' : ''}>${f} FO</option>`
-                ).join('')}
-              </select>
-            </div>
           </div>
           
           <!-- INICIO RAMAIS -->
