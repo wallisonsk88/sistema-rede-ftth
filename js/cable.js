@@ -304,6 +304,24 @@ function cableUpdate(id, key, val) {
     cable[key] = val;
     saveLocal();
     renderPanel();
+    
+    if (cable.layer) {
+      let distance = 0;
+      if (cable.path && cable.path.length > 1) {
+        for (let i = 0; i < cable.path.length - 1; i++) {
+          distance += map.distance(cable.path[i], cable.path[i+1]);
+        }
+      }
+      let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
+      
+      const tooltipHtml = `
+        <div style="text-align: center;">
+          <b>${cable.name || 'Cabo'}</b><br>
+          <span style="color: var(--primary);">🧵 ${cable.fibers} FO</span> | 📏 ${distStr}
+        </div>
+      `;
+      cable.layer.setTooltipContent(tooltipHtml);
+    }
   }
 }
 
