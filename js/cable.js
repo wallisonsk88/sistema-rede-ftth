@@ -246,11 +246,21 @@ function slicePathTo(cablePath, latlng) {
 
 /** Renderiza um cabo já salvo no estado */
 function renderCableOnMap(cableObj) {
+  let distance = 0;
+  if (cableObj.path && cableObj.path.length > 1) {
+    for (let i = 0; i < cableObj.path.length - 1; i++) {
+      distance += map.distance(cableObj.path[i], cableObj.path[i+1]);
+    }
+  }
+  let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
+
   const pl = L.polyline(cableObj.path, {
     color: '#cbd5e1', // Cinza claro para contrastar com o fundo escuro
     weight: 4,
     opacity: 0.9
   }).addTo(map);
+  
+  pl.bindTooltip(`📏 <b>${distStr}</b>`, { sticky: true });
   
   pl.on('click', ev => {
     L.DomEvent.stopPropagation(ev);
