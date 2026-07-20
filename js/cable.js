@@ -8,6 +8,12 @@ let currentCablePoints = [];
 let currentCablePolyline = null;
 let currentCableCursorLine = null; // Linha temp que segue o mouse
 let currentEditingCableId = null; // ID do cabo sendo continuado
+let isGeomanEditingCableId = null; // ID do cabo sendo editado de forma fina (Geoman)
+
+// Configuração Global do Geoman
+if (typeof map !== 'undefined' && map.pm) {
+  map.pm.setLang('pt_br');
+}
 
 // Cores padrão de tubos/fibras (1 a 12)
 const FIBER_COLORS = [
@@ -277,8 +283,64 @@ function renderCableOnMap(cableObj) {
       handleElementClick(cableObj.id, ev.latlng);
     }
   });
+
+  // Atualiza as coordenadas automaticamente quando o Geoman editar
+  pl.on('pm:edit', e => {
+    if (isGeomanEditingCableId === cableObj.id) {
+       const latlngs = e.layer.getLatLngs();
+       cableObj.path = latlngs.map(ll => [ll.lat, ll.lng]);
+       
+       // Atualiza a distância no tooltip
+       let distance = 0;
+       if (cableObj.path && cableObj.path.length > 1) {
+         for (let i = 0; i < cableObj.path.length - 1; i++) {
+           distance += map.distance(cableObj.path[i], cableObj.path[i+1]);
+         }
+       }
+       let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
+       
+       const tooltipHtml = `
+         <div style="text-align: center;">
+           <b>${cableObj.name || 'Cabo'}</b><br>
+           <span style="color: var(--primary);">🧵 ${cableObj.fibers} FO</span> | 📏 ${distStr}
+         </div>
+       `;
+       e.layer.setTooltipContent(tooltipHtml);
+    }
+  });
   
   cableObj.layer = pl;
+}
+
+/** Inicia ou finaliza a edição fina de nós com Geoman */
+function toggleGeomanEditCable(id) {
+  const cable = STATE.cables.find(c => c.id === id);
+  if (!cable || !cable.layer) return;
+
+  if (isGeomanEditingCableId === id) {
+     // Salva e finaliza edição
+     cable.layer.pm.disable();
+     isGeomanEditingCableId = null;
+     saveLocal();
+     toast('💾 Ajuste fino do cabo salvo com sucesso!');
+  } else {
+     // Se já houver outro cabo sendo editado, desliga ele primeiro
+     if (isGeomanEditingCableId) {
+        const oldCable = STATE.cables.find(c => c.id === isGeomanEditingCableId);
+        if (oldCable && oldCable.layer) {
+           oldCable.layer.pm.disable();
+           saveLocal();
+        }
+     }
+     // Ativa edição neste cabo
+     isGeomanEditingCableId = id;
+     cable.layer.pm.enable({
+       allowSelfIntersection: false,
+       preventMarkerRemoval: false
+     });
+     toast('✏️ Arraste os pontos brancos para reposicionar. Clique no meio da linha para criar um novo ponto.');
+  }
+  renderPanel();
 }
 
 /** Remove um cabo do sistema */

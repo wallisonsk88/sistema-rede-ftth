@@ -484,8 +484,13 @@ function renderCableProps(cable) {
   
   html += `
     <div style="margin-top:15px; display:flex; flex-direction:column; gap:8px;">
-      <button class="btn-full primary" onclick="resumeCableDraw('${cable.id}')">➕ Continuar Traçado</button>
-      <button class="btn-full" onclick="clearHighlight()">🧹 Limpar Destaques</button>
+      <button class="btn-full primary" onclick="resumeCableDraw('${cable.id}')">
+        ${currentEditingCableId === cable.id ? '🛑 Parar Traçado' : '➕ Continuar Traçado (Ponta)'}
+      </button>
+      <button class="btn-full" style="background:var(--surface2); border:1px solid var(--border); color:var(--text);" onclick="toggleGeomanEditCable('${cable.id}')">
+        ${(typeof isGeomanEditingCableId !== 'undefined' && isGeomanEditingCableId === cable.id) ? '💾 Salvar Ajuste Fino' : '✏️ Ajuste Fino (Meio/Pontas)'}
+      </button>
+      <button class="btn-full" style="background:#dc262622; color:#ef4444; border:1px solid #dc262644;" onclick="removeCable('${cable.id}')">🗑️ Excluir Cabo</button>
     </div>
   `;
 
