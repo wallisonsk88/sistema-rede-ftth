@@ -28,11 +28,11 @@ const tiles = {
   dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd', 
     maxZoom: 24, 
-    maxNativeZoom: 19
+    maxNativeZoom: 18
   }),
-  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     maxZoom: 24,
-    maxNativeZoom: 19
+    maxNativeZoom: 20
   }),
 };
 tiles.dark.addTo(map);
