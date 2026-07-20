@@ -260,7 +260,14 @@ function renderCableOnMap(cableObj) {
     opacity: 0.9
   }).addTo(map);
   
-  pl.bindTooltip(`📏 <b>${distStr}</b>`, { sticky: true });
+  const tooltipHtml = `
+    <div style="text-align: center;">
+      <b>${cableObj.name || 'Cabo'}</b><br>
+      <span style="color: var(--primary);">🧵 ${cableObj.fibers} FO</span> | 📏 ${distStr}
+    </div>
+  `;
+  
+  pl.bindTooltip(tooltipHtml, { sticky: true });
   
   pl.on('click', ev => {
     L.DomEvent.stopPropagation(ev);
