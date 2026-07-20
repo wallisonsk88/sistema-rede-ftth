@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    RESET & VARIÁVEIS GLOBAIS
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -207,6 +207,11 @@ body {
 
 body.drawing #map,
 body.drawing .leaflet-container { cursor: crosshair !important; }
+
+/* Remove a borda quadrada de seleção ao clicar no cabo (foco SVG) */
+path.leaflet-interactive:focus {
+  outline: none !important;
+}
 
 /* ============================================================
    PANEL DIREITO
