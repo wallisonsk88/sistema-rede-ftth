@@ -133,6 +133,8 @@ function renderPOPProps(pop) {
       <textarea class="fp-input" style="height:60px; resize:vertical;" 
         onchange="popUpdate('${pop.id}','obs',this.value)">${pop.obs || ''}</textarea>
     </div>
+
+    ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(pop.id) : ''}
   </div>`;
 
   // ============================================================
@@ -512,6 +514,8 @@ function renderSpliceProps(splice) {
         <textarea class="fp-input" style="height:60px; resize:vertical;" 
           onchange="updateSpliceField('${splice.id}','obs',this.value)">${splice.obs || ''}</textarea>
       </div>
+
+      ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(splice.id) : ''}
     </div>
 
     <div class="panel-header">
@@ -710,6 +714,8 @@ function renderCTOProps(cto, pop, pon, ramal) {
       <textarea class="fp-input" style="height:60px; resize:vertical;" 
         onchange="updateCTOField('${pop.id}', '${pon.index}', '${ramal.id}', '${cto.id}', 'obs', this.value)">${cto.obs || ''}</textarea>
     </div>
+
+    ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(cto.id) : ''}
   </div>`;
   return html;
 }
