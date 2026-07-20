@@ -5,6 +5,7 @@
 const map = L.map('map', {
   center: [-15.78, -47.93],
   zoom: 14,
+  maxZoom: 24, // Permite zoom super profundo
   zoomControl: false,
   attributionControl: false,
 });
@@ -25,10 +26,13 @@ L.Control.geocoder({
 // Camadas de mapa
 const tiles = {
   dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 20,
+    subdomains: 'abcd', 
+    maxZoom: 24, 
+    maxNativeZoom: 19
   }),
   satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 20,
+    maxZoom: 24,
+    maxNativeZoom: 19
   }),
 };
 tiles.dark.addTo(map);
