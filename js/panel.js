@@ -557,6 +557,24 @@ function renderSpliceProps(splice) {
        }
     });
 
+    // Check which trunk fibers are cut in upstream splices
+    const cutUpstreamFibers = {};
+    if (sourceCable && typeof getDistanceAlongCable === 'function') {
+      const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], sourceCable.path);
+      STATE.splices.forEach(s => {
+        if (s.cableId === splice.cableId && s.id !== splice.id && s.fusions) {
+          const sDist = getDistanceAlongCable([s.lat, s.lng], sourceCable.path);
+          if (sDist < thisSpliceDist) {
+            Object.values(s.fusions).forEach(cableFusions => {
+               Object.values(cableFusions).forEach(f => {
+                  cutUpstreamFibers[f] = true;
+               });
+            });
+          }
+        }
+      });
+    }
+
     const trunkFibers = sourceCable ? sourceCable.fibers : 12;
     for (let j = 1; j <= trunkFibers; j++) {
        const srcFColor = FIBER_COLORS[(j-1) % FIBER_COLORS.length];
@@ -564,7 +582,14 @@ function renderSpliceProps(splice) {
           html += `
             <div style="padding:6px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:6px; opacity:0.5;">
               <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:10px; color:var(--text2)">F${j} (Em uso)</span>
+              <span style="font-size:10px; color:var(--text2)">F${j} (Nesta CEO)</span>
+            </div>
+          `;
+       } else if (cutUpstreamFibers[j]) {
+          html += `
+            <div style="padding:6px; border-radius:4px; border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.05); display:flex; align-items:center; gap:6px; opacity:0.6;" title="Fibra já foi cortada e derivada em uma CEO anterior no mesmo cabo.">
+              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:10px; color:var(--red)">F${j} (Cortada Antes)</span>
             </div>
           `;
        } else {
