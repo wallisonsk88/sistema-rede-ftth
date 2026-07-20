@@ -71,6 +71,9 @@ window.resumeCableDraw = function(cableId) {
   
   if (currentCablePolyline) clearCableDraw();
   
+  setTool('cable'); // Muda para a ferramenta de cabo e reseta estados
+  
+  // Agora preenchemos o estado de desenho
   currentCableSourceType = cable.sourceType;
   currentCableSourceId = cable.sourceId;
   currentEditingCableId = cable.id;
@@ -91,7 +94,6 @@ window.resumeCableDraw = function(cableId) {
     interactive: false
   }).addTo(map);
 
-  setTool('cable'); // Muda para a ferramenta de cabo
   closeMobilePanel(); // Fecha painel lateral no mobile para focar no mapa
   
   map.on('mousemove', onCableMouseMove);
