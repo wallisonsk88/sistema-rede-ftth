@@ -483,7 +483,8 @@ function renderCableProps(cable) {
   html += `</div>`;
   
   html += `
-    <div style="margin-top:15px;">
+    <div style="margin-top:15px; display:flex; flex-direction:column; gap:8px;">
+      <button class="btn-full primary" onclick="resumeCableDraw('${cable.id}')">➕ Continuar Traçado</button>
       <button class="btn-full" onclick="clearHighlight()">🧹 Limpar Destaques</button>
     </div>
   `;

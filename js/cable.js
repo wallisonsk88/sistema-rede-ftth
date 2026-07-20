@@ -7,6 +7,7 @@ let currentCableSourceId = null;
 let currentCablePoints = [];
 let currentCablePolyline = null;
 let currentCableCursorLine = null; // Linha temp que segue o mouse
+let currentEditingCableId = null; // ID do cabo sendo continuado
 
 // Cores padrão de tubos/fibras (1 a 12)
 const FIBER_COLORS = [
@@ -63,6 +64,40 @@ function onCableMouseMove(e) {
   }
 }
 
+/** Continua o traçado de um cabo existente */
+window.resumeCableDraw = function(cableId) {
+  const cable = STATE.cables.find(c => c.id === cableId);
+  if (!cable) return;
+  
+  if (currentCablePolyline) clearCableDraw();
+  
+  currentCableSourceType = cable.sourceType;
+  currentCableSourceId = cable.sourceId;
+  currentEditingCableId = cable.id;
+  currentCablePoints = [...cable.path]; // Começa com os pontos existentes
+  
+  currentCablePolyline = L.polyline(currentCablePoints, {
+    color: '#38bdf8',
+    weight: 4,
+    opacity: 0.9,
+    interactive: false
+  }).addTo(map);
+
+  currentCableCursorLine = L.polyline([], {
+    color: '#38bdf8',
+    weight: 4,
+    dashArray: '5, 10',
+    opacity: 0.6,
+    interactive: false
+  }).addTo(map);
+
+  setTool('cable'); // Muda para a ferramenta de cabo
+  closeMobilePanel(); // Fecha painel lateral no mobile para focar no mapa
+  
+  map.on('mousemove', onCableMouseMove);
+  toast('🔌 Continuando traçado do cabo. Clique para adicionar mais pontos.');
+}
+
 /** Adiciona um ponto ao cabo atual */
 function cableAddPoint(lat, lng) {
   if (!currentCableSourceId) return toast('⚠️ Clique numa Origem (POP/CEO) para iniciar o cabo!');
@@ -78,6 +113,28 @@ function finishCable() {
     return;
   }
   
+  if (currentEditingCableId) {
+    // Atualiza cabo existente
+    const cable = STATE.cables.find(c => c.id === currentEditingCableId);
+    if (cable) {
+      cable.path = [...currentCablePoints];
+      if (cable.layer) {
+        map.removeLayer(cable.layer);
+      }
+      renderCableOnMap(cable);
+      saveLocal();
+      const id = currentEditingCableId;
+      clearCableDraw();
+      setTool('select');
+      selectElement(id);
+      toast('✅ Traçado do cabo atualizado!');
+    } else {
+      clearCableDraw();
+    }
+    return;
+  }
+  
+  // Cria novo cabo
   const id = 'cable_' + Date.now();
   const obj = {
     id,
@@ -110,6 +167,7 @@ function finishCable() {
 function clearCableDraw() {
   currentCableSourceType = null;
   currentCableSourceId = null;
+  currentEditingCableId = null;
   currentCablePoints = [];
   if (currentCablePolyline) { map.removeLayer(currentCablePolyline); currentCablePolyline = null; }
   if (currentCableCursorLine) { map.removeLayer(currentCableCursorLine); currentCableCursorLine = null; }
