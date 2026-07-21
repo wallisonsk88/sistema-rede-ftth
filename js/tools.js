@@ -52,7 +52,11 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
   const keys = { s: 'select', o: 'pop', c: 'cable', r: 'ruler' };
-  if (keys[e.key.toLowerCase()]) setTool(keys[e.key.toLowerCase()]);
+  if (keys[e.key.toLowerCase()] && !e.ctrlKey) setTool(keys[e.key.toLowerCase()]);
   if (e.key === 'Delete' || e.key === 'Backspace') setTool('eraser');
   if (e.key === 'Escape') { clearRuler(); setTool('select'); }
+  if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
+     e.preventDefault();
+     if (typeof undoLastAction === 'function') undoLastAction();
+  }
 });

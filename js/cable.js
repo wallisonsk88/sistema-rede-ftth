@@ -405,11 +405,33 @@ function setFiberMapping(cableId, fiberNumber, ramalId) {
   }
 }
 
-/** Propaga a rota/ramal pela árvore de cabos usando as fusões nas CEOs (Recursivo) */
 function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
   const splicesOnCable = STATE.splices.filter(s => s.cableId === cableId);
+  const cable = STATE.cables.find(c => c.id === cableId);
   
   splicesOnCable.forEach(splice => {
+    // Check if fiber is cut upstream of this splice
+    let isCutUpstream = false;
+    if (cable && typeof getDistanceAlongCable === 'function') {
+       const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], cable.path);
+       for (const otherSplice of splicesOnCable) {
+          if (otherSplice.id !== splice.id && otherSplice.fusions) {
+             const otherDist = getDistanceAlongCable([otherSplice.lat, otherSplice.lng], cable.path);
+             if (otherDist < thisSpliceDist) {
+                // If other splice uses this fiber, it's cut!
+                Object.values(otherSplice.fusions).forEach(fusions => {
+                   Object.values(fusions).forEach(f => {
+                      if (f == fiberNumber) isCutUpstream = true;
+                   });
+                });
+             }
+          }
+       }
+    }
+
+    // Se estiver cortada antes, o sinal (ramalId) que chega aqui é nulo.
+    const effectiveRamalId = isCutUpstream ? null : ramalId;
+
     if (splice.fusions) {
       Object.keys(splice.fusions).forEach(childCableId => {
         const childCable = STATE.cables.find(c => c.id === childCableId);
@@ -419,14 +441,14 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
             if (parentFiberNum == fiberNumber) {
               const childFiberNum = parseInt(childFiberStr);
               
-              if (ramalId) {
-                childCable.fiberMapping[childFiberNum] = ramalId;
+              if (effectiveRamalId) {
+                childCable.fiberMapping[childFiberNum] = effectiveRamalId;
               } else {
                 delete childCable.fiberMapping[childFiberNum];
               }
               
               // Continua propagando (cascata)
-              cascadeFiberMapping(childCableId, childFiberNum, ramalId);
+              cascadeFiberMapping(childCableId, childFiberNum, effectiveRamalId);
             }
           });
         }
@@ -435,38 +457,74 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
   });
 }
 
-/** Auto-mapeia as fibras dos cabos tronco que saem do POP na mesma ordem dos ramais */
+/** Auto-mapeia as fibras dos cabos tronco que saem do POP, respeitando a escolha manual do cabo */
 window.syncPopCables = function(popId) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop) return;
   
-  // Coleta todos os ramais criados no POP em ordem
-  let allRamais = [];
+  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === popId);
+  
+  // Limpa o mapeamento de todos os cabos tronco primeiro
+  rootCables.forEach(cable => {
+    cable.fiberMapping = {};
+  });
+
+  // Rastreia a próxima fibra livre para cada cabo
+  let cableNextFiber = {};
+  rootCables.forEach(c => cableNextFiber[c.id] = 1);
+
+  let unassignedRamais = [];
+
+  // Primeiro passo: alocar os ramais que tem cabo manual definido
   (pop.pons || []).forEach(pon => {
     (pon.ramais || []).forEach(ramal => {
-       allRamais.push(ramal.id);
+       if (ramal.cableId) {
+          const targetCable = rootCables.find(c => c.id === ramal.cableId);
+          if (targetCable) {
+             const fiberIndex = cableNextFiber[targetCable.id];
+             if (fiberIndex <= targetCable.fibers) {
+                 targetCable.fiberMapping[fiberIndex] = ramal.id;
+                 cableNextFiber[targetCable.id]++;
+             }
+          }
+       } else {
+          unassignedRamais.push(ramal.id);
+       }
     });
   });
 
-  // Acha todos os cabos tronco que nascem deste POP
-  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === popId);
-  
+  // Segundo passo: distribui os ramais automáticos (sem cabo definido) sequencialmente
+  let cIndex = 0;
+  for (let ramalId of unassignedRamais) {
+     let placed = false;
+     let attempts = 0;
+     while (!placed && attempts < rootCables.length) {
+         let currentCable = rootCables[cIndex % rootCables.length];
+         let fiberIndex = cableNextFiber[currentCable.id];
+         
+         if (fiberIndex <= currentCable.fibers) {
+             currentCable.fiberMapping[fiberIndex] = ramalId;
+             cableNextFiber[currentCable.id]++;
+             placed = true;
+         }
+         
+         if (fiberIndex >= currentCable.fibers) {
+            cIndex++; // Vai pro proximo cabo se o atual encheu
+         }
+         attempts++;
+     }
+  }
+
+  // Terceiro passo: Dispara a cascata (propagação pela árvore de fusões)
   rootCables.forEach(cable => {
     for (let i = 1; i <= cable.fibers; i++) {
-       const ramalId = allRamais[i - 1]; // Índice do array começa no zero
-       
-       if (ramalId) {
-         cable.fiberMapping[i] = ramalId;
-       } else {
-         delete cable.fiberMapping[i];
-       }
-       
-       // Força a cascata para os cabos derivados deste tronco
+       const ramalId = cable.fiberMapping[i];
        if (typeof cascadeFiberMapping === 'function') {
-           cascadeFiberMapping(cable.id, i, ramalId);
+           cascadeFiberMapping(cable.id, i, ramalId || null);
        }
     }
   });
+
   saveLocal();
 }
 
@@ -541,9 +599,13 @@ window.highlightRamal = function(popId, ramalId) {
                pathTrace = slicePathTo(c.path, [earliestCutSplice.lat, earliestCutSplice.lng]);
             }
 
+            // Pega a cor real da fibra física para usar no destaque
+            const fiberColorObj = FIBER_COLORS[(fNum - 1) % FIBER_COLORS.length];
+            const physicalColor = fiberColorObj ? fiberColorObj.hex : routeColor;
+
             // Cria a linha animada
             const traceLine = L.polyline(pathTrace, {
-               color: routeColor, 
+               color: physicalColor, 
                weight: 6, 
                opacity: 1, 
                dashArray: '10, 15', 

@@ -215,6 +215,9 @@ function updateRamal(popId, ponIndex, ramalId, key, val) {
        });
     }
     saveLocal();
+    if (key === 'cableId') {
+       if (typeof syncPopCables === 'function') syncPopCables(popId);
+    }
     renderPanel();
   }
 }

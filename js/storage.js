@@ -5,6 +5,8 @@
 const STORAGE_KEY = 'meganet_ftth_v2';
 
 let saveTimeout = null;
+window.STATE_HISTORY = [];
+window.isUndoing = false;
 
 function saveLocal() {
   const data = {
@@ -46,8 +48,21 @@ function saveLocal() {
       portCount: c.portCount
     }))
   };
+  
+  const currentStateJson = JSON.stringify(data);
+
+  // Histórico de Desfazer (Undo)
+  if (!window.isUndoing) {
+    if (window.STATE_HISTORY.length === 0 || window.STATE_HISTORY[window.STATE_HISTORY.length - 1] !== currentStateJson) {
+      window.STATE_HISTORY.push(currentStateJson);
+      if (window.STATE_HISTORY.length > 20) {
+        window.STATE_HISTORY.shift();
+      }
+    }
+  }
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, currentStateJson);
   } catch (e) {
     console.error('Erro ao salvar localmente:', e);
   }
@@ -97,6 +112,11 @@ function applyDataToState(data) {
   STATE.olts.forEach(o => {
     if (typeof syncPopCables === 'function') syncPopCables(o.id);
   });
+
+  // Centraliza o mapa no projeto carregado automaticamente
+  setTimeout(() => {
+    if (typeof fitBounds === 'function') fitBounds();
+  }, 500);
 }
 
 /** Tenta carregar da nuvem; se falhar, cai para o LocalStorage */
@@ -249,4 +269,36 @@ function clearAll(silent = false) {
   saveLocal();
 
   if (!silent) toast('🗑️ Projeto limpo');
+}
+
+/** Desfaz a última ação (Undo) */
+window.undoLastAction = function() {
+  if (window.STATE_HISTORY.length <= 1) {
+    toast('Nenhuma ação para desfazer');
+    return;
+  }
+  
+  // Remove o estado atual
+  window.STATE_HISTORY.pop();
+  
+  // Pega o estado anterior
+  const previousStateJson = window.STATE_HISTORY[window.STATE_HISTORY.length - 1];
+  
+  window.isUndoing = true;
+  
+  try {
+    const data = JSON.parse(previousStateJson);
+    clearAll(true);
+    applyDataToState(data);
+    
+    if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
+    if (typeof renderAllSplices === 'function') renderAllSplices();
+    
+    toast('↩️ Ação desfeita!');
+  } catch (e) {
+    console.error('Erro ao desfazer ação:', e);
+  } finally {
+    window.isUndoing = false;
+    saveLocal(); 
+  }
 }

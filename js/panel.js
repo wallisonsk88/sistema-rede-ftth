@@ -140,6 +140,48 @@ function renderPOPProps(pop) {
   // ============================================================
   //  SEÇÃO DE PORTAS PON / ROTAS
   // ============================================================
+  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === pop.id);
+
+  // CABOS RESUMO
+  if (rootCables.length > 0) {
+    html += `
+    <div class="panel-section" style="margin-bottom:15px; border-radius:8px; background:var(--surface2); border:1px solid var(--border);">
+      <div class="panel-section-title" style="padding:10px 15px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; color:var(--primary); margin:0;">
+        📊 Resumo de Cabos Tronco
+      </div>
+      <div style="padding:10px 15px; display:flex; flex-direction:column; gap:10px;">
+    `;
+    
+    rootCables.forEach(cable => {
+      let allocatedFibers = 0;
+      let ramaisNames = [];
+      
+      for(let i=1; i<=cable.fibers; i++) {
+         if (cable.fiberMapping && cable.fiberMapping[i]) {
+            allocatedFibers++;
+            let rId = cable.fiberMapping[i];
+            let rName = 'Desconhecido';
+            (pop.pons || []).forEach(p => {
+               const r = p.ramais?.find(rr => rr.id === rId);
+               if (r) rName = `${p.rotaName} - ${r.name}`;
+            });
+            ramaisNames.push(`<span style="font-size:10px; padding:2px 4px; background:var(--bg); border-radius:4px; border:1px solid var(--border); color:var(--text2); display:inline-block; margin:2px;">T${i}: ${rName}</span>`);
+         }
+      }
+      
+      html += `
+        <div>
+          <div style="font-size:11px; font-weight:700; color:var(--text); margin-bottom:4px;">
+            🧵 ${cable.name} <span style="font-weight:normal; color:var(--text3);">(${allocatedFibers}/${cable.fibers} FO)</span>
+          </div>
+          <div>${ramaisNames.length > 0 ? ramaisNames.join('') : '<span style="font-size:10px; color:var(--text3); font-style:italic;">Nenhum ramal alocado</span>'}</div>
+        </div>
+      `;
+    });
+    
+    html += `</div></div>`;
+  }
+
   html += `
   <div class="panel-section">
     <div class="panel-section-title">
@@ -154,16 +196,25 @@ function renderPOPProps(pop) {
 
     if (pon) {
       // ── PON CONFIGURADA ──
+      const detailsKey = `${pop.id}_pon_${i}`;
+      const isOpen = window.openPonDetails && window.openPonDetails[detailsKey] ? 'open' : '';
+      
       html += `
-      <div class="pon-card configured">
-        <div class="pon-color-bar" style="background:${pon.color}"></div>
-        <div class="pon-content">
-          <div class="pon-header">
-            <span class="pon-badge" style="background:${pon.color}20; color:${pon.color}; border:1px solid ${pon.color}44">
-              PON ${String(i).padStart(2, '0')}
-            </span>
-            <button class="pon-remove-btn" onclick="removePonRota('${pop.id}', ${i})" title="Liberar porta">✕</button>
+      <details class="pon-card configured" ${isOpen} ontoggle="window.openPonDetails = window.openPonDetails || {}; window.openPonDetails['${detailsKey}'] = this.open" style="display:block; padding:0; border:1px solid var(--border); background:var(--bg); border-radius:8px; margin-bottom:10px;">
+        <summary class="pon-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px; cursor:pointer; list-style:none; outline:none; user-select:none;">
+          <div style="display:flex; align-items:center; gap:10px;">
+             <div class="pon-color-bar" style="background:${pon.color}; width:6px; height:24px; border-radius:3px;"></div>
+             <span class="pon-badge" style="background:${pon.color}20; color:${pon.color}; border:1px solid ${pon.color}44">
+               PON ${String(i).padStart(2, '0')}
+             </span>
+             <span style="font-size:11px; font-weight:600; color:var(--text2);">${pon.rotaName} (${(pon.ramais||[]).length} ramais)</span>
           </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+             <span style="font-size:10px; color:var(--text3);">▼ expandir</span>
+             <button class="pon-remove-btn" onclick="removePonRota('${pop.id}', ${i})" title="Liberar porta">✕</button>
+          </div>
+        </summary>
+        <div class="pon-content" style="padding:0 10px 10px 10px; border-top:1px solid var(--border); margin-top:5px; padding-top:10px;">
           <div class="pon-field">
             <label>Nome da Rota</label>
             <input type="text" value="${pon.rotaName}"
@@ -204,6 +255,16 @@ function renderPOPProps(pop) {
                   </div>
                 </div>
                 
+                <div class="pon-field-row" style="margin-bottom:8px;">
+                  <div class="pon-field" style="flex:1">
+                    <label>Cabo Tronco (Saída)</label>
+                    <select onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'cableId', this.value)">
+                      <option value="">Automático (Sequencial)</option>
+                      ${rootCables.map(c => `<option value="${c.id}" ${ramal.cableId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+
                 <div class="pon-field-row" style="margin-bottom:8px;">
                   <div class="pon-field" style="flex:1">
                     <label>Topologia</label>
@@ -280,7 +341,7 @@ function renderPOPProps(pop) {
           <!-- FIM RAMAIS -->
 
         </div>
-      </div>`;
+      </details>`;
     } else {
       // ── PON LIVRE ──
       html += `
@@ -562,8 +623,9 @@ function renderSpliceProps(splice) {
        }
     });
 
-    // Check which trunk fibers are cut in upstream splices
+    // Check which trunk fibers are cut in upstream splices OR used in downstream splices
     const cutUpstreamFibers = {};
+    const usedDownstreamFibers = {};
     if (sourceCable && typeof getDistanceAlongCable === 'function') {
       const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], sourceCable.path);
       STATE.splices.forEach(s => {
@@ -573,6 +635,12 @@ function renderSpliceProps(splice) {
             Object.values(s.fusions).forEach(cableFusions => {
                Object.values(cableFusions).forEach(f => {
                   cutUpstreamFibers[f] = true;
+               });
+            });
+          } else if (sDist > thisSpliceDist) {
+            Object.values(s.fusions).forEach(cableFusions => {
+               Object.values(cableFusions).forEach(f => {
+                  usedDownstreamFibers[f] = true;
                });
             });
           }
@@ -597,6 +665,13 @@ function renderSpliceProps(splice) {
               <span style="font-size:10px; color:var(--red)">F${j} (Cortada Antes)</span>
             </div>
           `;
+       } else if (usedDownstreamFibers[j]) {
+          html += `
+            <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:6px; border-radius:4px; border:1px solid #eab308; background:rgba(234, 179, 8, 0.1); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Atenção: Esta fibra já está sendo usada em uma CEO mais à frente. Usá-la aqui cortará o sinal da CEO da frente.">
+              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:10px; font-weight:600; color:#ca8a04;">F${j} (Usada na Frente)</span>
+            </div>
+          `;
        } else {
           html += `
             <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:6px; border-radius:4px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
@@ -619,16 +694,31 @@ function renderSpliceProps(splice) {
        
        if (currentSrcFiber) {
            const srcFColor = FIBER_COLORS[(currentSrcFiber-1) % FIBER_COLORS.length];
-           html += `
-             <div style="padding:6px; border-radius:4px; border:1px solid #f97316; background:rgba(249, 115, 22, 0.15); display:flex; justify-content:space-between; align-items:center;">
-               <div style="display:flex; align-items:center; gap:4px;">
-                 <div style="width:8px; height:8px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
-                 <span style="font-size:10px; font-weight:bold; color:#fdba74;">F${currentSrcFiber} ➡️ F${i}</span>
-                 <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+           const isDead = cutUpstreamFibers[currentSrcFiber];
+           
+           if (isDead) {
+             html += `
+               <div style="padding:6px; border-radius:4px; border:1px solid #ef4444; background:rgba(239, 68, 68, 0.15); display:flex; justify-content:space-between; align-items:center;" title="Atenção: A fibra de origem F${currentSrcFiber} foi cortada em uma CEO anterior. O sinal não chega aqui!">
+                 <div style="display:flex; align-items:center; gap:4px; opacity:0.6;">
+                   <div style="width:8px; height:8px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                   <span style="font-size:10px; font-weight:bold; color:#fca5a5;"><strike>F${currentSrcFiber}</strike> (Sem Sinal) ➡️ F${i}</span>
+                   <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                 </div>
+                 <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Remover Fusão Morta">✖</button>
                </div>
-               <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer Fusão">✖</button>
-             </div>
-           `;
+             `;
+           } else {
+             html += `
+               <div style="padding:6px; border-radius:4px; border:1px solid #f97316; background:rgba(249, 115, 22, 0.15); display:flex; justify-content:space-between; align-items:center;">
+                 <div style="display:flex; align-items:center; gap:4px;">
+                   <div style="width:8px; height:8px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                   <span style="font-size:10px; font-weight:bold; color:#fdba74;">F${currentSrcFiber} ➡️ F${i}</span>
+                   <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                 </div>
+                 <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer Fusão">✖</button>
+               </div>
+             `;
+           }
        } else {
            html += `
              <div ondragover="allowDrop(event)" ondrop="dropFiber(event, '${splice.id}', '${dc.id}', ${i})" 
@@ -682,9 +772,36 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
          
          // Herdar Rota/Ramal automaticamente do cabo pai
          if (parentCable && childCable) {
-            const ramalId = parentCable.fiberMapping[parseInt(srcFiber)];
-            if (ramalId) {
-               childCable.fiberMapping[destFiber] = ramalId;
+            let effectiveRamalId = parentCable.fiberMapping[parseInt(srcFiber)];
+            
+            // Verifica se a fibra já foi cortada antes (upstream) nesta mesma linha de cabo
+            if (typeof getDistanceAlongCable === 'function') {
+               const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], parentCable.path);
+               const splicesOnCable = STATE.splices.filter(s => s.cableId === parentCable.id);
+               for (const otherSplice of splicesOnCable) {
+                  if (otherSplice.id !== splice.id && otherSplice.fusions) {
+                     const otherDist = getDistanceAlongCable([otherSplice.lat, otherSplice.lng], parentCable.path);
+                     if (otherDist < thisSpliceDist) {
+                        Object.values(otherSplice.fusions).forEach(fusions => {
+                           Object.values(fusions).forEach(f => {
+                              if (f == parseInt(srcFiber)) effectiveRamalId = null;
+                           });
+                        });
+                     }
+                  }
+               }
+            }
+
+            if (effectiveRamalId) {
+               childCable.fiberMapping[destFiber] = effectiveRamalId;
+               if (typeof cascadeFiberMapping === 'function') {
+                  cascadeFiberMapping(destCableId, destFiber, effectiveRamalId);
+               }
+            } else {
+               delete childCable.fiberMapping[destFiber];
+               if (typeof cascadeFiberMapping === 'function') {
+                  cascadeFiberMapping(destCableId, destFiber, null);
+               }
             }
          }
       } else {
@@ -693,10 +810,25 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
          // Limpa a herança se desfazer a fusão
          if (childCable) {
             delete childCable.fiberMapping[destFiber];
+            if (typeof cascadeFiberMapping === 'function') {
+               cascadeFiberMapping(destCableId, destFiber, null);
+            }
          }
       }
       saveLocal();
       toast('🔗 Matriz de fusão atualizada!');
+      
+      // Se houver roubo de fibra, precisamos recalcular os cabos filhos a frente
+      // Para garantir a integridade total do sinal no tronco, recalculamos a partir da origem do tronco
+      if (parentCable && typeof cascadeFiberMapping === 'function') {
+          // Re-cascateia todas as fibras do tronco para corrigir CEOs downstream
+          for(let i=1; i<=parentCable.fibers; i++) {
+              if (parentCable.fiberMapping[i]) {
+                  cascadeFiberMapping(parentCable.id, i, parentCable.fiberMapping[i]);
+              }
+          }
+      }
+      
       renderPanel();
    }
 }
