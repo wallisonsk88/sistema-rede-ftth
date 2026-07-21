@@ -543,14 +543,19 @@ window.highlightRamal = function(popId, ramalId) {
   window.activeTraceLines = [];
   window.activeRamalTrace = ramalId; // Memoriza qual ramal está ativo
 
-  // Encontra a cor correta da PON para este ramal
+  // Encontra a cor correta da PON para este ramal e o objeto do ramal
   let routeColor = '#f97316';
+  let ramalObj = null;
   const pop = STATE.olts.find(o => o.id === popId);
   if (pop && pop.pons) {
     for (const pon of pop.pons) {
-      if (pon.ramais && pon.ramais.some(r => r.id === ramalId)) {
-        routeColor = pon.color || '#f97316';
-        break;
+      if (pon.ramais) {
+        const found = pon.ramais.find(r => r.id === ramalId);
+        if (found) {
+          ramalObj = found;
+          routeColor = pon.color || '#f97316';
+          break;
+        }
       }
     }
   }
@@ -593,10 +598,29 @@ window.highlightRamal = function(popId, ramalId) {
                   }
                }
             }
+            
+            // Pega a CTO mais distante deste ramal neste cabo
+            let furthestCto = null;
+            let maxCtoDist = -1;
+            
+            if (ramalObj && ramalObj.ctos) {
+                ramalObj.ctos.forEach(cto => {
+                    if (cto.cableId === c.id && cto.lat && cto.lng) {
+                        const dist = getDistanceAlongCable([cto.lat, cto.lng], c.path);
+                        if (dist > maxCtoDist) {
+                            maxCtoDist = dist;
+                            furthestCto = cto;
+                        }
+                    }
+                });
+            }
 
             let pathTrace = c.path;
             if (earliestCutSplice) {
                pathTrace = slicePathTo(c.path, [earliestCutSplice.lat, earliestCutSplice.lng]);
+            } else if (furthestCto) {
+               // Se a fibra não foi cortada (derivada) e existem CTOs, o sinal "morre" na última CTO
+               pathTrace = slicePathTo(c.path, [furthestCto.lat, furthestCto.lng]);
             }
 
             // Pega a cor real da fibra física para usar no destaque

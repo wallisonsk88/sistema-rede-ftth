@@ -845,14 +845,41 @@ window.updateSpliceField = function(spliceId, field, value) {
 }
 
 function renderCTOProps(cto, pop, pon, ramal) {
+  // Descobre a fibra física em que esta CTO está no cabo
+  let fiberStr = "Sinal Ausente";
+  let fiberHex = "#475569";
+  
+  if (cto.cableId) {
+     const cable = STATE.cables.find(c => c.id === cto.cableId);
+     if (cable && cable.fiberMapping) {
+        for (let fNum in cable.fiberMapping) {
+           if (cable.fiberMapping[fNum] === ramal.id) {
+              const fiberObj = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(parseInt(fNum) - 1) % FIBER_COLORS.length] : null;
+              fiberStr = `Fibra ${fNum} (${fiberObj ? fiberObj.name : 'Desconhecida'})`;
+              fiberHex = fiberObj ? fiberObj.hex : '#ccc';
+              break;
+           }
+        }
+     }
+  }
+
   let html = `
   <div class="panel-section">
-    <div class="panel-section-title">
-      📦 CTO (Caixa de Terminação)
+    <div class="panel-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>📦 CTO (Caixa de Terminação)</span>
+      <button onclick="highlightRamal('${pop.id}', '${ramal.id}')" title="Destacar Rota no Mapa" style="background:none; border:none; cursor:pointer; font-size:16px; color:var(--primary); transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>
     </div>
 
     <div style="font-size:11px; color:var(--text2); margin-bottom:15px;">
       Hierarquia: <b>${pop.name}</b> ➡️ ${pon.rotaName} ➡️ ${ramal.name}
+    </div>
+    
+    <div class="fp-group" style="margin-bottom: 20px; background:var(--bg3); padding:10px; border-radius:6px;">
+      <label class="fp-label">Fibra Física no Cabo</label>
+      <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+          <div style="width:20px; height:20px; border-radius:50%; background:${fiberHex}; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>
+          <span style="font-size:14px; font-weight:bold; color:var(--text1)">${fiberStr}</span>
+      </div>
     </div>
 
     <div class="fp-group">
