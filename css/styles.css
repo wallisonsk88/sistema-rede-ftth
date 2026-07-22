@@ -283,6 +283,10 @@ path.leaflet-interactive:focus {
   outline: none;
   transition: .2s;
 }
+.fp-input option, .fp-select option {
+  background: var(--bg);
+  color: var(--text);
+}
 .fp-input:focus, .fp-select:focus { border-color: var(--primary); background: rgba(249,115,22,0.05); }
 .fp-select { cursor: pointer; }
 .fp-select option { background: #1a2235; }
