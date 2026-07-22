@@ -533,7 +533,7 @@ function renderCableProps(cable) {
           ${mappedRamalId && rootPopId ? `
             <div style="display:flex;">
               <button onclick="highlightRamal('${rootPopId}', '${mappedRamalId}')" title="Destacar ramal no cabo" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">🔍</button>
-              <button onclick="preparePlaceCTO('${rootPopId}', '${mappedRamalId}', '${cable.id}')" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
+              <button onclick="preparePlaceCTO('${rootPopId}', '${mappedRamalId}', '${cable.id}', ${i})" title="Lançar CTOs no mapa" style="background:none; border:none; cursor:pointer; font-size:14px; padding:4px;">📦</button>
             </div>
           ` : `<div style="width:52px"></div>`}
         </div>
@@ -582,6 +582,20 @@ function renderSpliceProps(splice) {
           onchange="updateSpliceField('${splice.id}','obs',this.value)">${splice.obs || ''}</textarea>
       </div>
 
+      <!-- PAINEL DO SPLITTER FÍSICO NA CEO -->
+      <div class="fp-group" style="background:var(--bg3); padding:10px; border-radius:6px; border:1px solid var(--border);">
+        <div style="font-size:12px; font-weight:bold; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+          <span>🎛️ Splitter Balanceado</span>
+        </div>
+        <label class="fp-label" style="font-size:10px;">Instalar Splitter (Desconecta fusões caso o tamanho mude)</label>
+        <select class="fp-input" onchange="installSplitterInSplice('${splice.id}', this.value)">
+          <option value="" ${!splice.splitter ? 'selected' : ''}>Nenhum Splitter Instalado</option>
+          <option value="4" ${splice.splitter && splice.splitter.outputs === 4 ? 'selected' : ''}>Splitter 1:4</option>
+          <option value="8" ${splice.splitter && splice.splitter.outputs === 8 ? 'selected' : ''}>Splitter 1:8</option>
+          <option value="16" ${splice.splitter && splice.splitter.outputs === 16 ? 'selected' : ''}>Splitter 1:16</option>
+        </select>
+      </div>
+
       ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(splice.id) : ''}
     </div>
 
@@ -602,7 +616,6 @@ function renderSpliceProps(splice) {
       html += `<div style="font-size:11px; color:var(--text2); text-align:center; padding:20px;">Nenhum cabo derivado ainda. Lance um cabo derivado para começar a fusão.</div></div>`;
       return html;
   }
-
   // Draw Kanban Board for each derived cable
   derivedCables.forEach(dc => {
     html += `
@@ -611,15 +624,25 @@ function renderSpliceProps(splice) {
         <div style="display:flex; gap:10px;">
           
           <!-- Left Column (Trunk Fibers) -->
-          <div style="flex:1; display:flex; flex-direction:column; gap:6px; border-right:1px dashed var(--border); padding-right:10px;">
-            <div style="font-size:10px; text-align:center; color:var(--text2); margin-bottom:4px;">Cabo Tronco (Arraste)</div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:6px; border-right:1px dashed var(--border); padding-right:5px;">
+            <div style="font-size:10px; text-align:center; color:var(--text2); margin-bottom:4px; line-height:1.3;">
+              <b style="color:var(--text1)">${sourceCable ? sourceCable.name : 'Cabo Tronco'}</b><br>
+              ${sourceCable ? `<span style="font-size:8px; color:var(--primary);">${sourceCable.fibers} FO</span>` : ''}
+            </div>
     `;
     
-    // Check which trunk fibers are already used in THIS splice
-    const usedTrunkFibers = {};
+    // Check how many times each trunk fiber is used in THIS splice
+    const trunkFiberUses = {};
     derivedCables.forEach(ddc => {
        if (splice.fusions[ddc.id]) {
-          Object.values(splice.fusions[ddc.id]).forEach(f => usedTrunkFibers[f] = true);
+          Object.values(splice.fusions[ddc.id]).forEach(f => {
+              if (typeof f === 'number' || !isNaN(f)) {
+                  trunkFiberUses[f] = (trunkFiberUses[f] || 0) + 1;
+              }
+              if (typeof f === 'string' && f.startsWith('S')) {
+                  trunkFiberUses[f] = true;
+              }
+          });
        }
     });
 
@@ -633,56 +656,134 @@ function renderSpliceProps(splice) {
           const sDist = getDistanceAlongCable([s.lat, s.lng], sourceCable.path);
           if (sDist < thisSpliceDist) {
             Object.values(s.fusions).forEach(cableFusions => {
-               Object.values(cableFusions).forEach(f => {
-                  cutUpstreamFibers[f] = true;
-               });
+               Object.values(cableFusions).forEach(f => cutUpstreamFibers[f] = true);
             });
+            if (s.splitter && s.splitter.inputFiber) cutUpstreamFibers[s.splitter.inputFiber] = true;
           } else if (sDist > thisSpliceDist) {
             Object.values(s.fusions).forEach(cableFusions => {
-               Object.values(cableFusions).forEach(f => {
-                  usedDownstreamFibers[f] = true;
-               });
+               Object.values(cableFusions).forEach(f => usedDownstreamFibers[f] = true);
             });
+            if (s.splitter && s.splitter.inputFiber) usedDownstreamFibers[s.splitter.inputFiber] = true;
           }
         }
       });
     }
 
+    // Renderiza as Fibras do Tronco
     const trunkFibers = sourceCable ? sourceCable.fibers : 12;
     for (let j = 1; j <= trunkFibers; j++) {
        const srcFColor = FIBER_COLORS[(j-1) % FIBER_COLORS.length];
-       if (usedTrunkFibers[j]) {
+       
+       let isInputFiber = (splice.splitter && splice.splitter.inputFiber == j);
+       let limit = 1; // Straight fusion limit
+       let uses = trunkFiberUses[j] || 0;
+       
+       if (isInputFiber) {
           html += `
-            <div style="padding:6px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:6px; opacity:0.5;">
-              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:10px; color:var(--text2)">F${j} (Nesta CEO)</span>
+            <div style="padding:4px; border-radius:4px; border:1px solid rgba(168, 85, 247, 0.4); background:rgba(168, 85, 247, 0.1); display:flex; align-items:center; gap:6px; opacity:0.8;" title="No Splitter">
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:9px; color:#d8b4fe; font-weight:bold;">F${j} (No Splitter)</span>
+            </div>
+          `;
+       } else if (uses >= limit) {
+          html += `
+            <div style="padding:4px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:6px; opacity:0.5;">
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:9px; color:var(--text2)">F${j} (Usada)</span>
             </div>
           `;
        } else if (cutUpstreamFibers[j]) {
           html += `
-            <div style="padding:6px; border-radius:4px; border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.05); display:flex; align-items:center; gap:6px; opacity:0.6;" title="Fibra já foi cortada e derivada em uma CEO anterior no mesmo cabo.">
-              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:10px; color:var(--red)">F${j} (Cortada Antes)</span>
+            <div style="padding:4px; border-radius:4px; border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.05); display:flex; align-items:center; gap:6px; opacity:0.6;" title="Cortada Antes">
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:9px; color:var(--red)">F${j} (Cortada)</span>
             </div>
           `;
        } else if (usedDownstreamFibers[j]) {
           html += `
-            <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:6px; border-radius:4px; border:1px solid #eab308; background:rgba(234, 179, 8, 0.1); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Atenção: Esta fibra já está sendo usada em uma CEO mais à frente. Usá-la aqui cortará o sinal da CEO da frente.">
-              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:10px; font-weight:600; color:#ca8a04;">F${j} (Usada na Frente)</span>
+            <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:4px; border-radius:4px; border:1px solid #eab308; background:rgba(234, 179, 8, 0.1); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Usada na Frente">
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:9px; font-weight:600; color:#ca8a04;">F${j} (Na frente)</span>
             </div>
           `;
        } else {
           html += `
-            <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:6px; border-radius:4px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
-              <div style="width:12px; height:12px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:10px; font-weight:600;">F${j} - ${srcFColor.name}</span>
+            <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:4px; border-radius:4px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <span style="font-size:9px; font-weight:600;">F${j} - ${srcFColor.name}</span>
             </div>
           `;
        }
     }
 
-    html += `</div>
+    html += `</div>`;
+    
+    // Middle Column (Splitter)
+    if (splice.splitter) {
+        html += `
+          <!-- Middle Column (Splitter) -->
+          <div style="flex:1.2; display:flex; flex-direction:column; align-items:center; border-right:1px dashed var(--border); padding:0 5px;">
+            <div style="font-size:10px; font-weight:bold; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:4px;">
+              <div style="width:0; height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; border-left:8px solid var(--primary);"></div>
+              Splitter 1:${splice.splitter.outputs}
+            </div>
+            
+            <!-- Entrada do Splitter -->
+            <div class="fusion-drop-zone" ondrop="dropFiberToSplitter(event, '${splice.id}')" ondragover="allowDrop(event)" style="width:100%; text-align:center; padding:8px; border:1px dashed ${splice.splitter.inputFiber ? 'var(--primary)' : 'var(--text2)'}; border-radius:4px; margin-bottom:10px; background:var(--surface2);">
+              <div style="font-size:8px; color:var(--text2); margin-bottom:4px;">ENTRADA (IN)</div>
+        `;
+        
+        if (splice.splitter.inputFiber) {
+            const inf = splice.splitter.inputFiber;
+            const infColor = FIBER_COLORS[(inf-1) % FIBER_COLORS.length];
+            html += `
+              <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(168, 85, 247, 0.15); padding:4px 8px; border-radius:4px; border:1px solid rgba(168, 85, 247, 0.4);">
+                <div style="width:10px; height:10px; border-radius:50%; background:${infColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+                <span style="font-size:10px; font-weight:bold; color:#d8b4fe;">F${inf}</span>
+                <span onclick="removeSplitterInput('${splice.id}')" style="cursor:pointer; color:#ef4444; font-size:10px; margin-left:4px; font-weight:bold;" title="Remover Fibra">✕</span>
+              </div>
+            `;
+        } else {
+            html += `<div style="font-size:9px; color:var(--text2);">Arraste a Fibra Tronco aqui</div>`;
+        }
+        
+        html += `</div>
+            <!-- Saídas do Splitter -->
+            <div style="font-size:8px; color:var(--text2); margin-bottom:4px;">SAÍDAS (OUT)</div>
+            <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:4px;">
+        `;
+        
+        for (let j = 1; j <= splice.splitter.outputs; j++) {
+            const sId = 'S' + j;
+            const outColor = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(j-1) % FIBER_COLORS.length] : { hex: 'var(--primary)', name: '' };
+            
+            if (trunkFiberUses[sId]) {
+               html += `
+                 <div style="padding:4px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:4px; opacity:0.5;">
+                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+                   <span style="font-size:8px; color:var(--text2)">OUT ${j} (${outColor.name})</span>
+                 </div>
+               `;
+            } else if (!splice.splitter.inputFiber) {
+               html += `
+                 <div style="padding:4px; border-radius:4px; border:1px solid var(--border); background:var(--surface2); display:flex; align-items:center; gap:4px; opacity:0.3;" title="Alimente o splitter primeiro!">
+                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+                   <span style="font-size:8px; color:var(--text2)">OUT ${j} (${outColor.name})</span>
+                 </div>
+               `;
+            } else {
+               html += `
+                 <div draggable="true" ondragstart="dragFiber(event, '${sId}')" style="padding:4px; border-radius:4px; border:1px solid ${outColor.hex}; background:rgba(59, 130, 246, 0.05); display:flex; align-items:center; gap:4px; cursor:grab; box-shadow:0 1px 2px rgba(0,0,0,0.2);" title="${outColor.name}">
+                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+                   <span style="font-size:8px; font-weight:bold; color:var(--text1)">OUT ${j}</span>
+                 </div>
+               `;
+            }
+        }
+        html += `</div></div>`;
+    }
+
+    html += `
           <!-- Right Column (Derived Fibers) -->
           <div style="flex:1; display:flex; flex-direction:column; gap:6px; padding-left:10px;">
             <div style="font-size:10px; text-align:center; color:var(--text2); margin-bottom:4px;">Cabo Derivado (Solte Aqui)</div>
@@ -693,15 +794,23 @@ function renderSpliceProps(splice) {
        const currentSrcFiber = splice.fusions[dc.id] ? splice.fusions[dc.id][i] : null;
        
        if (currentSrcFiber) {
-           const srcFColor = FIBER_COLORS[(currentSrcFiber-1) % FIBER_COLORS.length];
-           const isDead = cutUpstreamFibers[currentSrcFiber];
+           let srcFColor, srcLabel, isDead;
+           if (typeof currentSrcFiber === 'string' && currentSrcFiber.startsWith('S')) {
+               srcFColor = { hex: '#3b82f6' }; // Azul primary
+               srcLabel = 'SPL ' + currentSrcFiber.replace('S', 'OUT ');
+               isDead = false; // Splitter local não "morre" no meio do caminho, depende do input dele (o que verificamos no setFusion)
+           } else {
+               srcFColor = FIBER_COLORS[(parseInt(currentSrcFiber)-1) % FIBER_COLORS.length];
+               srcLabel = 'F' + currentSrcFiber;
+               isDead = cutUpstreamFibers[currentSrcFiber];
+           }
            
            if (isDead) {
              html += `
-               <div style="padding:6px; border-radius:4px; border:1px solid #ef4444; background:rgba(239, 68, 68, 0.15); display:flex; justify-content:space-between; align-items:center;" title="Atenção: A fibra de origem F${currentSrcFiber} foi cortada em uma CEO anterior. O sinal não chega aqui!">
+               <div style="padding:6px; border-radius:4px; border:1px solid #ef4444; background:rgba(239, 68, 68, 0.15); display:flex; justify-content:space-between; align-items:center;" title="Atenção: A fibra de origem ${srcLabel} foi cortada em uma CEO anterior. O sinal não chega aqui!">
                  <div style="display:flex; align-items:center; gap:4px; opacity:0.6;">
-                   <div style="width:8px; height:8px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
-                   <span style="font-size:10px; font-weight:bold; color:#fca5a5;"><strike>F${currentSrcFiber}</strike> (Sem Sinal) ➡️ F${i}</span>
+                   <div style="width:8px; height:8px; border-radius:2px; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                   <span style="font-size:10px; font-weight:bold; color:#fca5a5;"><strike>${srcLabel}</strike> (Sem Sinal) ➡️ F${i}</span>
                    <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
                  </div>
                  <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Remover Fusão Morta">✖</button>
@@ -711,8 +820,8 @@ function renderSpliceProps(splice) {
              html += `
                <div style="padding:6px; border-radius:4px; border:1px solid #f97316; background:rgba(249, 115, 22, 0.15); display:flex; justify-content:space-between; align-items:center;">
                  <div style="display:flex; align-items:center; gap:4px;">
-                   <div style="width:8px; height:8px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
-                   <span style="font-size:10px; font-weight:bold; color:#fdba74;">F${currentSrcFiber} ➡️ F${i}</span>
+                   <div style="width:8px; height:8px; border-radius:2px; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                   <span style="font-size:10px; font-weight:bold; color:#fdba74;">${srcLabel} ➡️ F${i}</span>
                    <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
                  </div>
                  <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer Fusão">✖</button>
@@ -758,6 +867,82 @@ window.removeFusion = function(spliceId, destCableId, destFiberIndex) {
   setFusion(spliceId, destCableId, destFiberIndex, null);
 }
 
+// Manipulação do Splitter Físico
+window.installSplitterInSplice = function(spliceId, outputs) {
+  const splice = STATE.splices.find(s => s.id === spliceId);
+  if (!splice) return;
+
+  if (!outputs) {
+    // Remove o splitter e limpa as fusões que eram dele (tudo que começa com 'S')
+    delete splice.splitter;
+    if (splice.fusions) {
+      Object.keys(splice.fusions).forEach(cableId => {
+        Object.keys(splice.fusions[cableId]).forEach(fiberIndex => {
+          if (typeof splice.fusions[cableId][fiberIndex] === 'string' && splice.fusions[cableId][fiberIndex].startsWith('S')) {
+            window.removeFusion(spliceId, cableId, fiberIndex); // Remove a herança também
+          }
+        });
+      });
+    }
+  } else {
+    // Instala um splitter novo
+    splice.splitter = {
+      outputs: parseInt(outputs),
+      inputFiber: null
+    };
+  }
+  saveLocal();
+  renderPanel();
+}
+
+window.dropFiberToSplitter = function(ev, spliceId) {
+   ev.preventDefault();
+   const srcFiber = ev.dataTransfer.getData("srcFiber");
+   if (srcFiber && !srcFiber.startsWith('S')) { // Cannot drop a splitter output into a splitter input
+      const splice = STATE.splices.find(s => s.id === spliceId);
+      if (splice && splice.splitter) {
+         splice.splitter.inputFiber = parseInt(srcFiber);
+         saveLocal();
+         toast('🔌 Fibra conectada à entrada do Splitter!');
+         // Re-cascateia as saídas do splitter
+         window.updateSplitterInput(spliceId, parseInt(srcFiber));
+      }
+   }
+}
+
+window.removeSplitterInput = function(spliceId) {
+   const splice = STATE.splices.find(s => s.id === spliceId);
+   if (splice && splice.splitter) {
+      splice.splitter.inputFiber = null;
+      saveLocal();
+      toast('🔌 Fibra removida do Splitter.');
+      window.updateSplitterInput(spliceId, null);
+   }
+}
+
+window.updateSplitterInput = function(spliceId, fiberIndex) {
+  const splice = STATE.splices.find(s => s.id === spliceId);
+  if (!splice || !splice.splitter) return;
+  splice.splitter.inputFiber = fiberIndex ? parseInt(fiberIndex) : null;
+  saveLocal();
+  
+  // Como mudamos a entrada do splitter, o ramal propagado por ele muda.
+  // Precisamos re-cascatear as fibras que estão conectadas nas saídas dele.
+  if (splice.fusions) {
+      Object.keys(splice.fusions).forEach(cableId => {
+          Object.keys(splice.fusions[cableId]).forEach(fIndex => {
+              const srcF = splice.fusions[cableId][fIndex];
+              if (typeof srcF === 'string' && srcF.startsWith('S')) {
+                  // Força a atualização do cascade dessa fibra
+                  window.setFusion(spliceId, cableId, fIndex, srcF);
+              }
+          });
+      });
+  }
+  
+  renderPanel();
+}
+
 window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
    const splice = STATE.splices.find(s => s.id === spliceId);
    if (splice) {
@@ -768,14 +953,29 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
       const childCable = STATE.cables.find(c => c.id === destCableId);
 
       if (srcFiber) {
-         splice.fusions[destCableId][destFiber] = parseInt(srcFiber);
+         if (typeof srcFiber === 'string' && srcFiber.startsWith('S')) {
+             splice.fusions[destCableId][destFiber] = srcFiber;
+         } else {
+             splice.fusions[destCableId][destFiber] = parseInt(srcFiber);
+         }
          
          // Herdar Rota/Ramal automaticamente do cabo pai
          if (parentCable && childCable) {
-            let effectiveRamalId = parentCable.fiberMapping[parseInt(srcFiber)];
+            let effectiveRamalId = null;
+            let checkFiber = null;
+
+            if (typeof srcFiber === 'string' && srcFiber.startsWith('S')) {
+               if (splice.splitter && splice.splitter.inputFiber) {
+                  effectiveRamalId = parentCable.fiberMapping[splice.splitter.inputFiber];
+                  checkFiber = splice.splitter.inputFiber;
+               }
+            } else {
+               effectiveRamalId = parentCable.fiberMapping[parseInt(srcFiber)];
+               checkFiber = parseInt(srcFiber);
+            }
             
             // Verifica se a fibra já foi cortada antes (upstream) nesta mesma linha de cabo
-            if (typeof getDistanceAlongCable === 'function') {
+            if (checkFiber && typeof getDistanceAlongCable === 'function') {
                const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], parentCable.path);
                const splicesOnCable = STATE.splices.filter(s => s.cableId === parentCable.id);
                for (const otherSplice of splicesOnCable) {
@@ -784,7 +984,9 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
                      if (otherDist < thisSpliceDist) {
                         Object.values(otherSplice.fusions).forEach(fusions => {
                            Object.values(fusions).forEach(f => {
-                              if (f == parseInt(srcFiber)) effectiveRamalId = null;
+                              if (f == checkFiber || (typeof f === 'string' && f.startsWith('S') && otherSplice.splitter && otherSplice.splitter.inputFiber == checkFiber)) {
+                                 effectiveRamalId = null;
+                              }
                            });
                         });
                      }
@@ -852,13 +1054,21 @@ function renderCTOProps(cto, pop, pon, ramal) {
   if (cto.cableId) {
      const cable = STATE.cables.find(c => c.id === cto.cableId);
      if (cable && cable.fiberMapping) {
-        for (let fNum in cable.fiberMapping) {
-           if (cable.fiberMapping[fNum] === ramal.id) {
-              const fiberObj = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(parseInt(fNum) - 1) % FIBER_COLORS.length] : null;
-              fiberStr = `Fibra ${fNum} (${fiberObj ? fiberObj.name : 'Desconhecida'})`;
-              fiberHex = fiberObj ? fiberObj.hex : '#ccc';
-              break;
-           }
+        if (cto.fiberIndex) {
+            const fNum = cto.fiberIndex;
+            const fiberObj = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(parseInt(fNum) - 1) % FIBER_COLORS.length] : null;
+            fiberStr = `Fibra ${fNum} (${fiberObj ? fiberObj.name : 'Desconhecida'})`;
+            fiberHex = fiberObj ? fiberObj.hex : '#ccc';
+        } else {
+            // Legado: pega a primeira fibra que pertence ao ramal
+            for (let fNum in cable.fiberMapping) {
+               if (cable.fiberMapping[fNum] === ramal.id) {
+                  const fiberObj = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(parseInt(fNum) - 1) % FIBER_COLORS.length] : null;
+                  fiberStr = `Fibra ${fNum} (${fiberObj ? fiberObj.name : 'Desconhecida'})`;
+                  fiberHex = fiberObj ? fiberObj.hex : '#ccc';
+                  break;
+               }
+            }
         }
      }
   }

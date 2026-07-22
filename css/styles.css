@@ -19,7 +19,7 @@
   --text:      #f1f5f9;
   --text2:     #94a3b8;
   --text3:     #475569;
-  --panel-w:   300px;
+  --panel-w:   380px;
   --topbar-h:  54px;
   --radius:    10px;
   --shadow:    0 4px 24px rgba(0,0,0,0.5);
@@ -968,3 +968,6 @@ path.leaflet-interactive:focus {
   to { opacity: 1; }
 }
 body.editing-cable .marker-cto, body.editing-cable .marker-pop, body.editing-cable .marker-splice { pointer-events: none !important; opacity: 0.5 !important; }
+svg:focus, path:focus, .leaflet-interactive:focus { outline: none !important; }
+.leaflet-container * { -webkit-tap-highlight-color: transparent; }
+

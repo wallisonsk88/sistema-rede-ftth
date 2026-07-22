@@ -2,10 +2,10 @@
  * cto.js — Lançamento contínuo de CTOs vinculadas a um cabo
  */
 
-let placingRamalContext = null; // { popId, ramalId, ponIndex, cableId }
+let placingRamalContext = null; // { popId, ramalId, ponIndex, cableId, fiberIndex }
 
 /** Prepara a interface para o lançamento sequencial de CTOs */
-function preparePlaceCTO(popId, ramalId, cableId) {
+function preparePlaceCTO(popId, ramalId, cableId, fiberIndex) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop) return;
 
@@ -18,7 +18,7 @@ function preparePlaceCTO(popId, ramalId, cableId) {
 
   if (ponIndex === -1) return;
 
-  placingRamalContext = { popId, ramalId, ponIndex, cableId };
+  placingRamalContext = { popId, ramalId, ponIndex, cableId, fiberIndex };
   
   setTool('cto_place');
   toast('📦 Clique no cabo para lançar as CTOs (ESC para sair)');
@@ -71,7 +71,7 @@ function snapToCable(lat, lng, cablePath) {
 function placeCTO(lat, lng) {
   if (!placingRamalContext) return;
 
-  const { popId, ramalId, ponIndex, cableId } = placingRamalContext;
+  const { popId, ramalId, ponIndex, cableId, fiberIndex } = placingRamalContext;
   
   const cable = STATE.cables.find(c => c.id === cableId);
   if (!cable) {
@@ -92,6 +92,16 @@ function placeCTO(lat, lng) {
 
   if (!ramal.ctos) ramal.ctos = [];
 
+  // Verifica se já existe uma CTO nesta mesma fibra ao longo deste cabo
+  if (fiberIndex !== undefined) {
+     const isFiberUsed = ramal.ctos.some(c => c.cableId === cableId && c.fiberIndex === fiberIndex);
+     if (isFiberUsed) {
+         alert('⚠️ Esta fibra já possui uma CTO conectada neste trecho! Em uma rede balanceada, você só pode colocar UMA CTO por fibra derivada do splitter.');
+         setTool('select');
+         return;
+     }
+  }
+
   // Busca a primeira CTO que ainda não foi posicionada no mapa
   const unplacedCto = ramal.ctos.find(c => !c.lat);
   let ctoName;
@@ -100,13 +110,20 @@ function placeCTO(lat, lng) {
     unplacedCto.lat = snap.latlng.lat;
     unplacedCto.lng = snap.latlng.lng;
     unplacedCto.cableId = cableId;
+    if (fiberIndex !== undefined) unplacedCto.fiberIndex = fiberIndex;
     ctoName = unplacedCto.name;
   } else {
-    // Se acabaram as CTOs geradas previamente, bloqueia o lançamento
-    toast(`⚠️ Limite atingido! Todas as CTOs deste ramal já foram colocadas no mapa.`);
-    setTool('select');
-    placingRamalContext = null;
-    return;
+    // Cria uma nova CTO se não houver pre-cadastrada
+    const newId = 'cto-' + Date.now();
+    ctoName = `CTO ${ramal.ctos.length + 1}`;
+    ramal.ctos.push({
+      id: newId,
+      name: ctoName,
+      lat: snap.latlng.lat,
+      lng: snap.latlng.lng,
+      cableId: cableId,
+      fiberIndex: fiberIndex !== undefined ? fiberIndex : null
+    });
   }
 
   saveLocal();
@@ -128,8 +145,25 @@ function renderAllCTOMarkers() {
         (ramal.ctos || []).forEach((cto, ctoIdx) => {
           if (cto.lat && cto.lng) {
             
+            let bgColor = pon.color || '#3b82f6';
+            let textColor = '#fff';
+            let tooltipExtra = '';
+            
+            if (cto.fiberIndex) {
+               const fColor = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(cto.fiberIndex - 1) % FIBER_COLORS.length] : null;
+               if (fColor) {
+                  bgColor = fColor.hex;
+                  // Fibras que são claras (Branco=3 e Amarelo=2) precisam de texto escuro
+                  const colorIdx = (cto.fiberIndex - 1) % 12;
+                  if (colorIdx === 1 || colorIdx === 2 || colorIdx === 10) { // Amarelo, Branco, Laranja
+                     textColor = '#000';
+                  }
+                  tooltipExtra = `<br>Fibra: ${cto.fiberIndex} (${fColor.name})`;
+               }
+            }
+
             const icon = L.divIcon({
-              html: `<div class="marker-cto" style="background:${pon.color}; color:#fff; border:2px solid #fff; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
+              html: `<div class="marker-cto" style="background:${bgColor}; color:${textColor}; border:2px solid ${textColor}; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
                        ${ctoIdx + 1}
                      </div>`,
               className: 'marker-cto',
@@ -143,9 +177,7 @@ function renderAllCTOMarkers() {
               zIndexOffset: 500,
             });
 
-
-
-            m.bindTooltip(`<b>${pop.name}</b><br>${pon.rotaName} - ${ramal.name}<br>${cto.name}<br>Splitter: ${cto.ratio}`, { direction: 'top', offset: [0, -10] });
+            m.bindTooltip(`<b>${pop.name}</b><br>${pon.rotaName} - ${ramal.name}<br>${cto.name}<br>Splitter: ${cto.ratio}${tooltipExtra}`, { direction: 'top', offset: [0, -10] });
 
             // Atualiza posição forçando Snap
             m.on('dragend', ev => {

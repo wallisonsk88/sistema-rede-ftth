@@ -37,7 +37,9 @@ function saveLocal() {
       lat: s.lat,
       lng: s.lng,
       cableId: s.cableId,
-      fusions: s.fusions
+      fusions: s.fusions,
+      splitter: s.splitter,
+      obs: s.obs
     })),
     ctos: STATE.ctos.map(c => ({
       id: c.id,
@@ -45,7 +47,9 @@ function saveLocal() {
       lat: c.lat,
       lng: c.lng,
       cableId: c.cableId,
-      portCount: c.portCount
+      portCount: c.portCount,
+      fiberIndex: c.fiberIndex,
+      ratio: c.ratio
     }))
   };
   

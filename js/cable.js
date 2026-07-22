@@ -480,7 +480,15 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
         if (childCable) {
           Object.keys(splice.fusions[childCableId]).forEach(childFiberStr => {
             const parentFiberNum = splice.fusions[childCableId][childFiberStr];
-            if (parentFiberNum == fiberNumber) {
+            
+            let isMatched = (parentFiberNum == fiberNumber);
+            if (typeof parentFiberNum === 'string' && parentFiberNum.startsWith('S')) {
+                if (splice.splitter && splice.splitter.inputFiber == fiberNumber) {
+                    isMatched = true;
+                }
+            }
+
+            if (isMatched) {
               const childFiberNum = parseInt(childFiberStr);
               
               if (effectiveRamalId) {
