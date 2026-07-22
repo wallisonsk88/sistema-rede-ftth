@@ -667,6 +667,24 @@ function renderSpliceProps(splice) {
           }
         }
       });
+      
+      // Checa também as CTOs (Caixas) no mesmo cabo
+      STATE.olts.forEach(pop => {
+         (pop.pons || []).forEach(pon => {
+            (pon.ramais || []).forEach(ramal => {
+               (ramal.ctos || []).forEach(cto => {
+                   if (cto.cableId === splice.cableId && cto.fiberIndex && cto.lat && cto.lng) {
+                       const ctoDist = getDistanceAlongCable([cto.lat, cto.lng], sourceCable.path);
+                       if (ctoDist < thisSpliceDist) {
+                          cutUpstreamFibers[cto.fiberIndex] = true;
+                       } else if (ctoDist > thisSpliceDist) {
+                          usedDownstreamFibers[cto.fiberIndex] = true;
+                       }
+                   }
+               });
+            });
+         });
+      });
     }
 
     // Renderiza as Fibras do Tronco
