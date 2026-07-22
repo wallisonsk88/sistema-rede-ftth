@@ -153,17 +153,12 @@ function renderAllCTOMarkers() {
                const fColor = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(cto.fiberIndex - 1) % FIBER_COLORS.length] : null;
                if (fColor) {
                   bgColor = fColor.hex;
-                  // Fibras que são claras (Branco=3 e Amarelo=2) precisam de texto escuro
-                  const colorIdx = (cto.fiberIndex - 1) % 12;
-                  if (colorIdx === 1 || colorIdx === 2 || colorIdx === 10) { // Amarelo, Branco, Laranja
-                     textColor = '#000';
-                  }
-                  tooltipExtra = `<br>Fibra: ${cto.fiberIndex} (${fColor.name})`;
+                  tooltipExtra = `<br>Fibra Local: ${cto.fiberIndex} (${fColor.name})`;
                }
             }
 
             const icon = L.divIcon({
-              html: `<div class="marker-cto" style="background:${bgColor}; color:${textColor}; border:2px solid ${textColor}; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
+              html: `<div class="marker-cto" style="background:${bgColor}; color:#000; border:2px solid #fff; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
                        ${ctoIdx + 1}
                      </div>`,
               className: 'marker-cto',
