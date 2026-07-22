@@ -267,8 +267,20 @@ function renderCableOnMap(cableObj) {
   }
   let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
 
+  let cableColor = '#cbd5e1';
+  if (cableObj.sourceType === 'splice') {
+      const splice = STATE.splices.find(s => s.id === cableObj.sourceId);
+      if (splice && splice.splitter && splice.splitter.inputFiber) {
+          const fIdx = parseInt(splice.splitter.inputFiber) - 1;
+          if (fIdx >= 0 && typeof FIBER_COLORS !== 'undefined') {
+              cableColor = FIBER_COLORS[fIdx % FIBER_COLORS.length].hex;
+          }
+      }
+  }
+
   const pl = L.polyline(cableObj.path, {
-    color: '#cbd5e1', // Cinza claro para contrastar com o fundo escuro
+    color: cableColor, // Cor dinâmica baseada no splitter ou cinza claro padrão
+
     weight: 4,
     opacity: 0.9
   }).addTo(map);
