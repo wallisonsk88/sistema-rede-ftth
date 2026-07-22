@@ -650,16 +650,35 @@ function renderSpliceProps(splice) {
     const cutUpstreamFibers = {};
     const usedDownstreamFibers = {};
     if (sourceCable && typeof getDistanceAlongCable === 'function') {
+      let isReversed = false;
+      let srcCoord = null;
+      if (sourceCable.sourceType === 'pop') {
+         const pop = STATE.olts.find(o => o.id === sourceCable.sourceId);
+         if (pop) srcCoord = [pop.lat, pop.lng];
+      } else if (sourceCable.sourceType === 'splice') {
+         const sp = STATE.splices.find(s => s.id === sourceCable.sourceId);
+         if (sp) srcCoord = [sp.lat, sp.lng];
+      }
+      
+      if (srcCoord && sourceCable.path && sourceCable.path.length > 1) {
+         const distStart = typeof map !== 'undefined' ? map.distance(srcCoord, sourceCable.path[0]) : 0;
+         const distEnd = typeof map !== 'undefined' ? map.distance(srcCoord, sourceCable.path[sourceCable.path.length - 1]) : Infinity;
+         if (distEnd < distStart) isReversed = true;
+      }
+      
       const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], sourceCable.path);
+      
       STATE.splices.forEach(s => {
         if (s.cableId === splice.cableId && s.id !== splice.id && s.fusions) {
           const sDist = getDistanceAlongCable([s.lat, s.lng], sourceCable.path);
-          if (sDist < thisSpliceDist) {
+          let isUpstream = isReversed ? (sDist > thisSpliceDist) : (sDist < thisSpliceDist);
+          
+          if (isUpstream) {
             Object.values(s.fusions).forEach(cableFusions => {
                Object.values(cableFusions).forEach(f => cutUpstreamFibers[f] = true);
             });
             if (s.splitter && s.splitter.inputFiber) cutUpstreamFibers[s.splitter.inputFiber] = true;
-          } else if (sDist > thisSpliceDist) {
+          } else {
             Object.values(s.fusions).forEach(cableFusions => {
                Object.values(cableFusions).forEach(f => usedDownstreamFibers[f] = true);
             });
@@ -675,9 +694,11 @@ function renderSpliceProps(splice) {
                (ramal.ctos || []).forEach(cto => {
                    if (cto.cableId === splice.cableId && cto.fiberIndex && cto.lat && cto.lng) {
                        const ctoDist = getDistanceAlongCable([cto.lat, cto.lng], sourceCable.path);
-                       if (ctoDist < thisSpliceDist) {
+                       let isUpstream = isReversed ? (ctoDist > thisSpliceDist) : (ctoDist < thisSpliceDist);
+                       
+                       if (isUpstream) {
                           cutUpstreamFibers[cto.fiberIndex] = true;
-                       } else if (ctoDist > thisSpliceDist) {
+                       } else {
                           usedDownstreamFibers[cto.fiberIndex] = true;
                        }
                    }
