@@ -267,20 +267,8 @@ function renderCableOnMap(cableObj) {
   }
   let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
 
-  let cableColor = '#cbd5e1';
-  if (cableObj.sourceType === 'splice') {
-      const splice = STATE.splices.find(s => s.id === cableObj.sourceId);
-      if (splice && splice.splitter && splice.splitter.inputFiber) {
-          const fIdx = parseInt(splice.splitter.inputFiber) - 1;
-          if (fIdx >= 0 && typeof FIBER_COLORS !== 'undefined') {
-              cableColor = FIBER_COLORS[fIdx % FIBER_COLORS.length].hex;
-          }
-      }
-  }
-
   const pl = L.polyline(cableObj.path, {
-    color: cableColor, // Cor dinâmica baseada no splitter ou cinza claro padrão
-
+    color: '#cbd5e1', // Cinza claro para contrastar com o fundo escuro
     weight: 4,
     opacity: 0.9
   }).addTo(map);
@@ -622,6 +610,26 @@ window.highlightRamal = function(popId, ramalId) {
     }
   }
 
+  // Descobre qual fibra do cabo tronco que sai do POP alimenta este ramal (para usar a cor dela)
+  let rootFiberNum = null;
+  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === popId);
+  for (const rc of rootCables) {
+      if (rc.fiberMapping) {
+         for (let fn in rc.fiberMapping) {
+            if (rc.fiberMapping[fn] === ramalId) {
+                rootFiberNum = parseInt(fn);
+                break;
+            }
+         }
+      }
+      if (rootFiberNum) break;
+  }
+  
+  if (rootFiberNum) {
+      const fiberColorObj = FIBER_COLORS[(rootFiberNum - 1) % FIBER_COLORS.length];
+      if (fiberColorObj) routeColor = fiberColorObj.hex;
+  }
+
   // Fade out em todos os cabos originais
   STATE.cables.forEach(c => {
     if (c.layer) {
@@ -685,9 +693,8 @@ window.highlightRamal = function(popId, ramalId) {
                pathTrace = slicePathTo(c.path, [furthestCto.lat, furthestCto.lng]);
             }
 
-            // Pega a cor real da fibra física para usar no destaque
-            const fiberColorObj = FIBER_COLORS[(fNum - 1) % FIBER_COLORS.length];
-            const physicalColor = fiberColorObj ? fiberColorObj.hex : routeColor;
+            // Usa a cor da rota/ramal (que agora herda da fibra tronco principal)
+            const physicalColor = routeColor;
 
             // Cria a linha animada
             const traceLine = L.polyline(pathTrace, {
