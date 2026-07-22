@@ -43,7 +43,7 @@ function createPOPMarker(obj) {
              <div class="olt-marker" id="mk_${obj.id}">🏢</div>
              <div class="olt-label" id="pop_lbl_${obj.id}">${obj.name}</div>
            </div>`,
-    className: '',
+    className: 'marker-pop',
     iconSize: [40, 40],
     iconAnchor: [20, 20],
     popupAnchor: [0, -22],

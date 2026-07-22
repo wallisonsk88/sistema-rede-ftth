@@ -110,6 +110,13 @@ window.resumeCableDraw = function(cableId) {
 function cableAddPoint(lat, lng) {
   if (!currentCableSourceId) return toast('⚠️ Clique numa Origem (POP/CEO) para iniciar o cabo!');
   
+  if (currentCablePoints.length > 0) {
+    const lastPt = currentCablePoints[currentCablePoints.length - 1];
+    const dist = map.distance([lastPt[0], lastPt[1]], [lat, lng]);
+    // Previne duplo clique ou pontos no mesmo lugar (ex: dist < 1 metro)
+    if (dist < 1) return;
+  }
+  
   currentCablePoints.push([lat, lng]);
   currentCablePolyline.setLatLngs(currentCablePoints);
 }
@@ -284,6 +291,16 @@ function renderCableOnMap(cableObj) {
     }
   });
 
+  // Botão direito no cabo para entrar no modo de edição (se já estiver editando, não faz nada para permitir que o Geoman use o botão direito para deletar o vértice)
+  pl.on('contextmenu', ev => {
+    if (STATE.tool !== 'eraser') {
+       if (isGeomanEditingCableId !== cableObj.id) {
+           L.DomEvent.stopPropagation(ev);
+           toggleGeomanEditCable(cableObj.id);
+       }
+    }
+  });
+
   // Atualiza as coordenadas automaticamente quando o Geoman editar
   pl.on('pm:edit', e => {
     if (isGeomanEditingCableId === cableObj.id) {
@@ -321,6 +338,7 @@ function toggleGeomanEditCable(id) {
      // Salva e finaliza edição
      cable.layer.pm.disable();
      isGeomanEditingCableId = null;
+     document.body.classList.remove('editing-cable');
      saveLocal();
      toast('💾 Ajuste fino do cabo salvo com sucesso!');
   } else {
@@ -334,11 +352,30 @@ function toggleGeomanEditCable(id) {
      }
      // Ativa edição neste cabo
      isGeomanEditingCableId = id;
+     document.body.classList.add('editing-cable');
+     
+     // Remove pontos duplicados para evitar bugs de nós sobrepostos (causados por duplo clique)
+     if (cable.path && cable.path.length > 0) {
+       const cleanedPath = [cable.path[0]];
+       for (let i = 1; i < cable.path.length; i++) {
+         const lastPt = cleanedPath[cleanedPath.length - 1];
+         const currPt = cable.path[i];
+         const dist = map.distance([lastPt[0], lastPt[1]], [currPt[0], currPt[1]]);
+         if (dist > 1) {
+           cleanedPath.push(currPt);
+         }
+       }
+       cable.path = cleanedPath;
+       if (cable.layer) {
+         cable.layer.setLatLngs(cleanedPath);
+       }
+     }
+
      cable.layer.pm.enable({
-       allowSelfIntersection: false,
+       allowSelfIntersection: true,
        preventMarkerRemoval: false
      });
-     toast('✏️ Arraste os pontos brancos para reposicionar. Clique no meio da linha para criar um novo ponto.');
+     toast('✏️ Edição livre: Clique com botão direito na bolinha para apagar. Arraste para mover.');
   }
   renderPanel();
 }
@@ -349,6 +386,11 @@ function removeCable(id) {
   if (cIndex === -1) return;
   const cable = STATE.cables[cIndex];
   
+  if (isGeomanEditingCableId === id) {
+    isGeomanEditingCableId = null;
+    document.body.classList.remove('editing-cable');
+  }
+
   if (cable.layer) map.removeLayer(cable.layer);
   STATE.cables.splice(cIndex, 1);
   

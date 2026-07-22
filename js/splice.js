@@ -59,7 +59,8 @@ function renderAllSplices() {
       iconUrl: 'img/ceo.svg',
       iconSize: [20, 40],
       iconAnchor: [10, 20],
-      tooltipAnchor: [0, -20]
+      tooltipAnchor: [0, -20],
+      className: 'marker-splice'
     });
 
     const m = L.marker([splice.lat, splice.lng], {

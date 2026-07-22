@@ -129,10 +129,10 @@ function renderAllCTOMarkers() {
           if (cto.lat && cto.lng) {
             
             const icon = L.divIcon({
-              html: `<div class="cto-marker" style="background:${pon.color}; color:#fff; border:2px solid #fff; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
+              html: `<div class="marker-cto" style="background:${pon.color}; color:#fff; border:2px solid #fff; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
                        ${ctoIdx + 1}
                      </div>`,
-              className: '',
+              className: 'marker-cto',
               iconSize: [26, 26],
               iconAnchor: [13, 13],
             });

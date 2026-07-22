@@ -766,9 +766,205 @@ path.leaflet-interactive:focus {
 }
 
 /* ============================================================
+  width: 6px;
+  flex-shrink: 0;
+}
+.pon-content {
+  flex: 1;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pon-card.free .pon-content {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px;
+}
+.pon-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pon-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.free-badge {
+  background: var(--surface2);
+  color: var(--text3);
+}
+.pon-free-text {
+  font-size: 11px;
+  color: var(--text2);
+}
+.pon-remove-btn {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: .2s;
+}
+.pon-remove-btn:hover {
+  color: var(--red);
+}
+.pon-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pon-field label {
+  font-size: 10px;
+  color: var(--text2);
+  font-weight: 600;
+}
+.pon-field input, .pon-field select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 4px 6px;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+}
+.pon-field input:focus, .pon-field select:focus {
+  border-color: var(--primary);
+}
+.pon-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* ============================================================
+   RESPONSIVO (MOBILE)
+   ============================================================ */
+@media (max-width: 768px) {
+  .topbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 10px;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  .logo { font-size: 14px; gap: 5px; }
+  .logo-icon { width: 24px; height: 24px; font-size: 12px; }
+  .project-name-input { width: 100px; font-size: 12px; }
+  
+  .topbar-btn { padding: 8px; flex-shrink: 0; }
+  /* Oculta os textos dos botões de ação e deixa só o ícone */
+  .topbar-btn { font-size: 16px; border:none; background: transparent; }
+  .topbar-btn:hover { background: rgba(255,255,255,0.1); }
+  .tb-text { display: none; }
+  /* Remove separator para poupar espaço */
+  .topbar-sep { display: none; }
+
+  /* WORKSPACE FLUXO (Coluna) */
+  .workspace { flex-direction: column; position: relative; }
+
+  /* TOOLBAR (Base Horizontal) */
+  .toolbar {
+    width: 100%;
+    height: 60px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid var(--border);
+    padding: 0 5px;
+    justify-content: flex-start;
+    align-items: center;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 5px;
+  }
+  .tool-group-sep { width: 1px; height: 30px; margin: 0 5px; flex-shrink: 0; }
+  
+  .tool-btn { width: 45px; height: 45px; flex-shrink: 0; }
+  .tool-btn::after { display: none !important; } /* sem tooltip no touch */
+
+  /* MAPA */
+  #map { width: 100%; height: calc(100vh - var(--topbar-h) - 60px); flex: none; }
+
+  /* PANEL DIREITO -> GAVETA LATERAL (Off-canvas) */
+  .panel-right {
+    position: fixed;
+    top: var(--topbar-h); /* Começa abaixo do topbar */
+    right: -100%; /* Totalmente fora da tela na direita */
+    bottom: 60px; /* Acima da toolbar horizontal */
+    width: 85vw; /* Ocupa 85% da largura da tela */
+    height: auto;
+    border-left: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.7);
+    z-index: 2000;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Quando aberto */
+  .panel-right.mobile-open {
+    right: 0; /* Desliza para dentro */
+  }
+
+  /* Botão de Fechar mobile (agora na lateral superior) */
+  .mobile-close-btn {
+    display: flex !important;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    width: 30px; height: 30px;
+    align-items: center; justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 50;
+  }
+  
+  /* Botão Hambúrguer Mobile */
+  .mobile-hamburger-btn {
+    display: flex !important;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 5px;
+  }
+}
+
+/* Esconde no Desktop */
+.mobile-close-btn { display: none; }
+.mobile-hamburger-btn { display: none; }
+
+
+/* ============================================================
+   ANIMACAO DE FLUXO DE FIBRA
+   ============================================================ */
+@keyframes flow-anim {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+.cable-flow {
+  stroke-dasharray: 12, 12;
+  animation: flow-anim 1s linear infinite;
+  stroke-linecap: round;
+  z-index: 900;
+}
+
+/* ============================================================
    LIGHTBOX DE FOTOS
    ============================================================ */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+body.editing-cable .marker-cto, body.editing-cable .marker-pop, body.editing-cable .marker-splice { pointer-events: none !important; opacity: 0.5 !important; }
