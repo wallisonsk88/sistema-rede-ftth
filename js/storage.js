@@ -10,6 +10,7 @@ window.isUndoing = false;
 
 function saveLocal() {
   const data = {
+    timestamp: Date.now(),
     projectName: document.getElementById('projectName').value,
     nextOLTNum: STATE.nextOLTNum,
     olts: STATE.olts.map(o => ({
@@ -134,8 +135,32 @@ async function loadFromCloud() {
         .maybeSingle();
         
       if (!error && data && data.data) {
+        const cloudData = data.data;
+        
+        // Anti-Data Loss: Verifica se o LocalStorage tem uma versão mais nova (caso o navegador fechou antes de salvar na nuvem)
+        const localJson = localStorage.getItem(STORAGE_KEY);
+        let useLocal = false;
+        if (localJson) {
+           try {
+              const localData = JSON.parse(localJson);
+              const localTime = localData.timestamp || 0;
+              const cloudTime = cloudData.timestamp || 0;
+              if (localTime > cloudTime) {
+                 useLocal = true;
+                 console.warn('⚠️ A versão LocalStorage é mais recente que a da Nuvem! Restaurando dados locais...');
+              }
+           } catch(e) {}
+        }
+        
+        if (useLocal) {
+            loadLocal();
+            // Dispara um novo save para forçar a nuvem a se atualizar com a versão local recuperada
+            setTimeout(() => { saveLocal(); }, 1500);
+            return;
+        }
+
         console.log('☁️ Projeto carregado da Nuvem!');
-        applyDataToState(data.data);
+        applyDataToState(cloudData);
         return;
       } else if (error && error.code !== 'PGRST116') {
         console.warn('Falha ao ler da nuvem (ou tabela não existe), tentando backup local.', error);
