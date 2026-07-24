@@ -2,8 +2,10 @@
  * storage.js — Persistência local, importação e exportação
  */
 
-const STORAGE_KEY = 'meganet_ftth_v2';
-
+const urlParams = new URLSearchParams(window.location.search);
+const currentProjectId = urlParams.get('id');
+const STORAGE_KEY = currentProjectId ? `meganet_ftth_project_${currentProjectId}` : 'meganet_ftth_v2';
+let currentUser = null;
 let saveTimeout = null;
 window.STATE_HISTORY = [];
 window.isUndoing = false;
@@ -76,10 +78,12 @@ function saveLocal() {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(async () => {
     try {
-      if (typeof supabaseClient === 'undefined') return;
+      if (typeof supabaseClient === 'undefined' || !currentProjectId || !currentUser) return;
       const { error } = await supabaseClient
         .from('ftth_projects')
-        .upsert([{ id: 1, name: data.projectName, data: data, updated_at: new Date() }]);
+        .update({ name: data.projectName, data: data, updated_at: new Date() })
+        .eq('id', currentProjectId)
+        .eq('user_id', currentUser.id);
       
       if (error) {
         if (error.code === '42P01') {
@@ -126,12 +130,27 @@ function applyDataToState(data) {
 
 /** Tenta carregar da nuvem; se falhar, cai para o LocalStorage */
 async function loadFromCloud() {
+  if (!currentProjectId) {
+     alert('Projeto não encontrado. Redirecionando para o painel...');
+     window.location.href = 'dashboard.html';
+     return;
+  }
+  
   try {
     if (typeof supabaseClient !== 'undefined') {
+      // Verifica Autenticação
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+         window.location.href = 'login.html';
+         return;
+      }
+      currentUser = session.user;
+      
       const { data, error } = await supabaseClient
         .from('ftth_projects')
         .select('data')
-        .eq('id', 1)
+        .eq('id', currentProjectId)
+        .eq('user_id', currentUser.id)
         .maybeSingle();
         
       if (!error && data && data.data) {

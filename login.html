@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - MEGANET FTTX</title>
+  <link rel="icon" type="image/png" href="img/logo_small.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text1: #f8fafc;
+      --text2: #94a3b8;
+      --border: #334155;
+      --error: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body {
+      background-color: var(--bg);
+      color: var(--text1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .auth-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .auth-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .auth-header img {
+      height: 50px;
+      margin-bottom: 15px;
+    }
+    .auth-header h2 {
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .auth-header p {
+      color: var(--text2);
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text2);
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text1);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus {
+      border-color: var(--primary);
+    }
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 15px;
+    }
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text1);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    .auth-footer {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text2);
+    }
+    .auth-footer a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .auth-footer a:hover {
+      text-decoration: underline;
+    }
+    #error-msg {
+      color: var(--error);
+      font-size: 13px;
+      text-align: center;
+      margin-bottom: 15px;
+      display: none;
+    }
+    .loader {
+      display: none;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-left-color: #fff;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div class="auth-container" id="login-view">
+    <div class="auth-header">
+      <img src="img/logo_small.png" alt="Meganet FTTX">
+      <h2>Entrar no Sistema</h2>
+      <p>Acesse seus projetos de rede FTTH</p>
+    </div>
+    
+    <div id="error-msg"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="email" required placeholder="seu@email.com">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn" id="btn-login">
+        <span id="login-text">Entrar</span>
+        <div class="loader" id="login-loader"></div>
+      </button>
+    </form>
+    
+    <div class="auth-footer">
+      Não tem uma conta? <a href="#" onclick="toggleView('register-view')">Cadastre-se</a>
+    </div>
+  </div>
+
+  <div class="auth-container" id="register-view" style="display: none;">
+    <div class="auth-header">
+      <img src="img/logo_small.png" alt="Meganet FTTX">
+      <h2>Criar Conta</h2>
+      <p>Comece a projetar redes hoje mesmo</p>
+    </div>
+    
+    <div id="reg-error-msg" style="color: var(--error); font-size: 13px; text-align: center; margin-bottom: 15px; display: none;"></div>
+    <div id="reg-success-msg" style="color: #4ade80; font-size: 13px; text-align: center; margin-bottom: 15px; display: none;"></div>
+
+    <form id="register-form">
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="reg-email" required placeholder="seu@email.com">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="reg-password" required placeholder="No mínimo 6 caracteres">
+      </div>
+      <button type="submit" class="btn" id="btn-register">
+        <span id="reg-text">Cadastrar</span>
+        <div class="loader" id="reg-loader"></div>
+      </button>
+    </form>
+    
+    <div class="auth-footer">
+      Já possui conta? <a href="#" onclick="toggleView('login-view')">Fazer Login</a>
+    </div>
+  </div>
+
+  <!-- Supabase -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <!-- App JS -->
+  <script src="js/supabase-client.js?v=42"></script>
+  <script src="js/auth.js?v=42"></script>
+  <script>
+    function toggleView(viewId) {
+      document.getElementById('login-view').style.display = 'none';
+      document.getElementById('register-view').style.display = 'none';
+      document.getElementById(viewId).style.display = 'block';
+      document.getElementById('error-msg').style.display = 'none';
+      document.getElementById('reg-error-msg').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meus Projetos - MEGANET FTTX</title>
+  <link rel="icon" type="image/png" href="img/logo_small.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-hover: #334155;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text1: #f8fafc;
+      --text2: #94a3b8;
+      --border: #334155;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body {
+      background-color: var(--bg);
+      color: var(--text1);
+      min-height: 100vh;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 30px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar img { height: 35px; }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      font-size: 14px;
+      color: var(--text2);
+    }
+    .btn-logout {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text1);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.1); }
+    
+    .container {
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    .header-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .header-actions h1 { font-size: 24px; font-weight: 600; }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+    
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .project-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      position: relative;
+    }
+    .project-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+      border-color: var(--primary);
+    }
+    .project-title { font-size: 18px; font-weight: 600; margin-bottom: 10px; padding-right: 30px; }
+    .project-date { font-size: 12px; color: var(--text2); }
+    
+    .btn-delete {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: transparent;
+      border: none;
+      color: var(--text2);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 5px;
+      border-radius: 4px;
+    }
+    .btn-delete:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+    
+    .loading-state {
+      text-align: center;
+      padding: 50px;
+      color: var(--text2);
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px;
+      background: var(--surface);
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+      grid-column: 1 / -1;
+    }
+    .empty-state h3 { margin-bottom: 10px; color: var(--text1); }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <img src="img/logo_small.png" alt="Meganet FTTX">
+    <div class="user-info">
+      <span id="user-email">Carregando...</span>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="header-actions">
+      <h1>Meus Projetos</h1>
+      <button class="btn-primary" onclick="createNewProject()">
+        <span>+</span> Novo Projeto
+      </button>
+    </div>
+
+    <div id="projects-container" class="projects-grid">
+      <div class="loading-state">Carregando projetos...</div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js?v=42"></script>
+  <script src="js/dashboard.js?v=42"></script>
+</body>
+</html>
