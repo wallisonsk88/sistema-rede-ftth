@@ -81,16 +81,17 @@ async function createNewProject() {
     };
     
     try {
+        const newId = crypto.randomUUID();
         const { data, error } = await supabaseClient
             .from('ftth_projects')
-            .insert([{ name: name, data: initialData, user_id: currentUser.id }])
+            .insert([{ id: newId, name: name, data: initialData, user_id: currentUser.id }])
             .select()
             .single();
             
         if (error) throw error;
         
         // Redireciona para o novo projeto
-        window.location.href = `index.html?id=${data.id}`;
+        window.location.href = `index.html?id=${data.id || newId}`;
     } catch (error) {
         console.error(error);
         alert('Erro ao criar projeto: ' + error.message);
