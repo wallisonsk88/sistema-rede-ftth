@@ -101,19 +101,15 @@ function renderPOPProps(pop) {
 
   let html = `
   <div class="panel-section">
-    <div class="panel-section-title">🏢 POP / OLT</div>
+    <div class="panel-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>🏢 POP / OLT</span>
+      <button onclick="addOltEquipment('${pop.id}')" style="background:var(--primary); color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer;">+ Adicionar OLT</button>
+    </div>
 
     <div class="fp-group">
       <label class="fp-label">Nome</label>
       <input class="fp-input" value="${pop.name}"
         onchange="popUpdate('${pop.id}','name',this.value)">
-    </div>
-
-    <div class="fp-group">
-      <label class="fp-label">Potência TX (dBm)</label>
-      <input class="fp-input" type="number" step=".5"
-        value="${pop.outputPower || 4}"
-        onchange="popUpdate('${pop.id}','outputPower',parseFloat(this.value))">
     </div>
 
     <div class="fp-group">
@@ -123,91 +119,9 @@ function renderPOPProps(pop) {
         <input class="fp-input" value="${pop.lng.toFixed(6)}" readonly>
       </div>
     </div>
-    
-    <div class="fp-group">
-      <label class="fp-label">Observações</label>
-      <textarea class="fp-input" style="height:60px; resize:vertical;" 
-        onchange="popUpdate('${pop.id}','obs',this.value)">${pop.obs || ''}</textarea>
-    </div>
 
     ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(pop.id) : ''}
   </div>`;
-
-  // ============================================================
-  //  SEÇÃO DE PORTAS PON / ROTAS
-  // ============================================================
-  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === pop.id);
-
-  // CABOS RESUMO
-  if (rootCables.length > 0) {
-    html += `
-    <div class="panel-section" style="margin-bottom:15px; border-radius:8px; background:var(--surface2); border:1px solid var(--border);">
-      <div class="panel-section-title" style="padding:10px 15px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; color:var(--primary); margin:0;">
-        📊 Resumo de Cabos Tronco
-      </div>
-      <div style="padding:10px 15px; display:flex; flex-direction:column; gap:10px;">
-    `;
-    
-    rootCables.forEach(cable => {
-      let allocatedFibers = 0;
-      let ramaisNames = [];
-      
-      for(let i=1; i<=cable.fibers; i++) {
-         if (cable.fiberMapping && cable.fiberMapping[i]) {
-            allocatedFibers++;
-            let rId = cable.fiberMapping[i];
-            let rName = 'Desconhecido';
-            (pop.pons || []).forEach(p => {
-               const r = p.ramais?.find(rr => rr.id === rId);
-               if (r) rName = `${p.rotaName} - ${r.name}`;
-            });
-            ramaisNames.push(`<span style="font-size:10px; padding:2px 4px; background:var(--bg); border-radius:4px; border:1px solid var(--border); color:var(--text2); display:inline-block; margin:2px;">T${i}: ${rName}</span>`);
-         }
-      }
-      
-      html += `
-        <div>
-          <div style="font-size:11px; font-weight:700; color:var(--text); margin-bottom:4px;">
-            🧵 ${cable.name} <span style="font-weight:normal; color:var(--text3);">(${allocatedFibers}/${cable.fibers} FO)</span>
-          </div>
-          <div>${ramaisNames.length > 0 ? ramaisNames.join('') : '<span style="font-size:10px; color:var(--text3); font-style:italic;">Nenhum ramal alocado</span>'}</div>
-        </div>
-      `;
-    });
-    
-    html += `</div></div>`;
-  }
-
-  // ============================================================
-  // EQUIPAMENTOS OLT
-  // ============================================================
-  html += `
-  <div class="panel-section" style="margin-bottom:15px; border-radius:8px; background:var(--surface2); border:1px solid var(--border);">
-    <div class="panel-section-title" style="padding:10px 15px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; color:var(--primary); margin:0; display:flex; justify-content:space-between; align-items:center;">
-      <span>🏢 Equipamentos OLT</span>
-      <button onclick="addOltEquipment('${pop.id}')" style="background:var(--primary); color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer;">+ Adicionar</button>
-    </div>
-    <div style="padding:10px 15px; display:flex; flex-direction:column; gap:10px;">
-  `;
-
-  pop.oltEquipments.forEach((olt, idx) => {
-    html += `
-      <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <input type="text" value="${olt.name}" onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'name', this.value)" style="font-size:12px; font-weight:bold; background:transparent; border:none; color:var(--text); outline:none; border-bottom:1px dashed var(--border); width:150px;">
-          <button onclick="removeOltEquipment('${pop.id}', '${olt.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:12px;" title="Remover OLT">✕</button>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px; font-size:11px; color:var(--text2);">
-          <span>Qtd. Portas PON:</span>
-          <select onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'ports', this.value)" style="background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 4px;">
-            ${[2, 4, 8, 16, 32].map(n => `<option value="${n}" ${olt.ports == n ? 'selected' : ''}>${n}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-    `;
-  });
-
-  html += `</div></div>`;
 
   html += `
   <div class="panel-section">
@@ -228,7 +142,30 @@ function renderPOPProps(pop) {
           <span>⚙️ ${olt.name} (${olt.ports} Portas)</span>
           <span style="font-size:10px; color:var(--text3);">▼ expandir</span>
         </summary>
-        <div style="padding: 10px; border-top:1px solid var(--border);">
+        <div style="padding: 10px; border-top:1px solid var(--border); background:var(--bg); margin:10px; border-radius:6px;">
+          <!-- OLT config -->
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">
+            <input type="text" value="${olt.name}" onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'name', this.value)" style="font-size:12px; font-weight:bold; background:transparent; border:none; color:var(--text); outline:none; width:150px;" placeholder="Nome da OLT">
+            <button onclick="removeOltEquipment('${pop.id}', '${olt.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:12px;" title="Remover OLT">🗑️</button>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
+            <div>
+              <label style="font-size:10px; color:var(--text3);">Qtd. Portas PON</label>
+              <select onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'ports', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px;">
+                ${[2, 4, 8, 16, 32].map(n => `<option value="${n}" ${olt.ports == n ? 'selected' : ''}>${n}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label style="font-size:10px; color:var(--text3);">Potência TX (dBm)</label>
+              <input type="number" step="0.5" value="${olt.outputPower !== undefined ? olt.outputPower : (pop.outputPower || 4)}" onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'outputPower', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px;">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:10px; color:var(--text3);">Observações da OLT</label>
+            <textarea onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'obs', this.value)" style="width:100%; height:40px; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px; resize:vertical;">${olt.obs || ''}</textarea>
+          </div>
+        </div>
+        <div style="padding: 10px;">
     `;
 
     for (let j = 1; j <= (parseInt(olt.ports) || 8); j++) {
@@ -318,7 +255,7 @@ function renderPOPProps(pop) {
                   </div>
                 `;
                 
-                const cascadeResults = window.calcOpticalPower ? window.calcOpticalPower(pop.outputPower, ramal) : [];
+                const cascadeResults = window.calcOpticalPower ? window.calcOpticalPower((olt.outputPower !== undefined ? olt.outputPower : pop.outputPower) || 4, ramal) : [];
                 
                 ramalHtml += `
                   <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
@@ -401,6 +338,52 @@ function renderPOPProps(pop) {
   }); // forEach olt
 
   html += `</div>`;
+
+  // ============================================================
+  //  SEÇÃO DE PORTAS PON / ROTAS
+  // ============================================================
+  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === pop.id);
+
+  // CABOS RESUMO
+  if (rootCables.length > 0) {
+    html += `
+    <div class="panel-section" style="margin-bottom:15px; border-radius:8px; background:var(--surface2); border:1px solid var(--border);">
+      <div class="panel-section-title" style="padding:10px 15px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; color:var(--primary); margin:0;">
+        📊 Resumo de Cabos Tronco
+      </div>
+      <div style="padding:10px 15px; display:flex; flex-direction:column; gap:10px;">
+    `;
+    
+    rootCables.forEach(cable => {
+      let allocatedFibers = 0;
+      let ramaisNames = [];
+      
+      for(let i=1; i<=cable.fibers; i++) {
+         if (cable.fiberMapping && cable.fiberMapping[i]) {
+            allocatedFibers++;
+            let rId = cable.fiberMapping[i];
+            let rName = 'Desconhecido';
+            (pop.pons || []).forEach(p => {
+               const r = p.ramais?.find(rr => rr.id === rId);
+               if (r) rName = `${p.rotaName} - ${r.name}`;
+            });
+            ramaisNames.push(`<span style="font-size:10px; padding:2px 4px; background:var(--bg); border-radius:4px; border:1px solid var(--border); color:var(--text2); display:inline-block; margin:2px;">T${i}: ${rName}</span>`);
+         }
+      }
+      
+      html += `
+        <div>
+          <div style="font-size:11px; font-weight:700; color:var(--text); margin-bottom:4px;">
+            🧵 ${cable.name} <span style="font-weight:normal; color:var(--text3);">(${allocatedFibers}/${cable.fibers} FO)</span>
+          </div>
+          <div>${ramaisNames.length > 0 ? ramaisNames.join('') : '<span style="font-size:10px; color:var(--text3); font-style:italic;">Nenhum ramal alocado</span>'}</div>
+        </div>
+      `;
+    });
+    
+    html += `</div></div>`;
+  }
+
 
   // Botões de ação do POP
   html += `

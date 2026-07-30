@@ -194,6 +194,7 @@ window.updateOltEquipment = function(popId, oltId, prop, value) {
   if (!olt) return;
   
   if (prop === 'ports') value = parseInt(value) || 8;
+  if (prop === 'outputPower') value = parseFloat(value) || 0;
   
   olt[prop] = value;
   saveLocal();
