@@ -93,7 +93,7 @@ function placeCTO(lat, lng) {
   if (!ramal.ctos) ramal.ctos = [];
 
   // Verifica se já existe uma CTO nesta mesma fibra ao longo deste cabo
-  if (fiberIndex !== undefined) {
+  if (fiberIndex !== undefined && ramal.type !== 'desbalanceado') {
      const isFiberUsed = ramal.ctos.some(c => c.cableId === cableId && c.fiberIndex === fiberIndex);
      if (isFiberUsed) {
          alert('⚠️ Esta fibra já possui uma CTO conectada neste trecho! Em uma rede balanceada, você só pode colocar UMA CTO por fibra derivada do splitter.');
