@@ -168,12 +168,19 @@ function renderPOPProps(pop) {
           <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
             <label style="font-size:10px; color:var(--primary); font-weight:bold;">🔗 Cabo Tronco (Backbone) Vinculado</label>
             <div style="font-size:9px; color:var(--text3); margin-bottom:4px;">Selecione o cabo que sairá desta OLT. Apenas rotas desta OLT irão para ele.</div>
-            <select onchange="window.linkCableToOlt('${pop.id}', '${olt.id}', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--surface2); border:1px solid var(--primary); color:var(--text); border-radius:4px; outline:none;">
-               <option value="">-- Nenhum / Livre --</option>
-               ${STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === pop.id || c.popId === pop.id)).map(c => 
-                  `<option value="${c.id}" ${c.oltId === olt.id ? 'selected' : ''}>${c.name || 'Cabo Tronco ' + c.fibers + ' FO'}</option>`
-               ).join('')}
-            </select>
+            <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px; background:var(--bg); padding:6px; border-radius:4px; border:1px solid var(--border);">
+               ${(() => {
+                  const rootCables = STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === pop.id || c.popId === pop.id));
+                  if (rootCables.length === 0) return '<span style="font-size:10px; color:var(--text3);">Nenhum cabo saindo deste POP.</span>';
+                  
+                  return rootCables.map(c => 
+                     `<label style="font-size:11px; display:flex; align-items:center; gap:6px; color:var(--text); cursor:pointer;">
+                        <input type="checkbox" ${c.oltId === olt.id ? 'checked' : ''} onchange="window.toggleCableOltLink('${c.id}', '${olt.id}', this.checked)" style="accent-color:var(--primary);">
+                        ${c.name || 'Cabo Tronco ' + c.fibers + ' FO'} ${c.oltId && c.oltId !== olt.id ? '<span style="color:var(--text3); font-size:9px;">(Vinculado a outra OLT)</span>' : ''}
+                      </label>`
+                  ).join('');
+               })()}
+            </div>
           </div>
         </div>
         <div style="padding: 10px;">
@@ -1275,5 +1282,22 @@ window.linkCableToOlt = function(popId, oltId, cableId) {
    
    if (typeof window.saveLocal === 'function') window.saveLocal();
    if (typeof window.syncPopCables === 'function') window.syncPopCables(popId);
+   if (typeof window.renderPanel === 'function') window.renderPanel();
+};
+
+window.toggleCableOltLink = function(cableId, oltId, isLinked) {
+   const cable = STATE.cables.find(c => c.id === cableId);
+   if (cable) {
+       if (isLinked) {
+           cable.oltId = oltId;
+       } else {
+           if (cable.oltId === oltId) cable.oltId = null;
+       }
+   }
+   
+   if (typeof window.saveLocal === 'function') window.saveLocal();
+   
+   const popId = cable ? (cable.sourceId || cable.popId) : null;
+   if (popId && typeof window.syncPopCables === 'function') window.syncPopCables(popId);
    if (typeof window.renderPanel === 'function') window.renderPanel();
 };
