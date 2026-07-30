@@ -113,17 +113,10 @@ function placeCTO(lat, lng) {
     if (fiberIndex !== undefined) unplacedCto.fiberIndex = fiberIndex;
     ctoName = unplacedCto.name;
   } else {
-    // Cria uma nova CTO se não houver pre-cadastrada
-    const newId = 'cto-' + Date.now();
-    ctoName = `CTO ${ramal.ctos.length + 1}`;
-    ramal.ctos.push({
-      id: newId,
-      name: ctoName,
-      lat: snap.latlng.lat,
-      lng: snap.latlng.lng,
-      cableId: cableId,
-      fiberIndex: fiberIndex !== undefined ? fiberIndex : null
-    });
+    // Limite alcançado, não cria CTO nova além do especificado
+    alert(`⚠️ Limite atingido! Você especificou apenas ${ramal.ctos.length} CTOs para o ramal "${ramal.name}". Se precisar de mais, aumente a quantidade no painel do POP.`);
+    setTool('select');
+    return;
   }
 
   saveLocal();
