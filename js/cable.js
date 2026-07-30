@@ -512,56 +512,76 @@ window.syncPopCables = function(popId) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop) return;
   
-  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === popId);
+  const rootCables = STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === popId || c.popId === popId));
   
-  // Limpa o mapeamento de todos os cabos tronco primeiro
+  // NUNCA limpa mapeamento! Isso deletava as escolhas manuais que o usuário fez no painel do cabo!
+  // Em vez disso, vamos apenas verificar quais ramais já estão mapeados e quais fibras estão livres.
+
+  let mappedRamais = new Set();
+  let cableNextFiber = {};
+  
   rootCables.forEach(cable => {
-    cable.fiberMapping = {};
+    if (!cable.fiberMapping) cable.fiberMapping = {};
+    for (let i = 1; i <= cable.fibers; i++) {
+        if (cable.fiberMapping[i]) {
+            mappedRamais.add(cable.fiberMapping[i]);
+        }
+    }
+    // Encontra a primeira fibra livre para iniciar
+    let firstFree = 1;
+    while(cable.fiberMapping[firstFree] && firstFree <= cable.fibers) {
+        firstFree++;
+    }
+    cableNextFiber[cable.id] = firstFree;
   });
 
-  // Rastreia a próxima fibra livre para cada cabo
-  let cableNextFiber = {};
-  rootCables.forEach(c => cableNextFiber[c.id] = 1);
+  // Mapa de OLT do PON para sabermos a quem o ramal pertence
+  let globalIndexCounter = 1;
+  let ponToOltMap = {};
+  (pop.oltEquipments || []).forEach(olt => {
+    let ports = parseInt(olt.ports) || 8;
+    for (let j = 1; j <= ports; j++) {
+      ponToOltMap[globalIndexCounter++] = olt.id;
+    }
+  });
 
+  // Pega ramais não mapeados ainda (que o usuário acabou de criar)
   let unassignedRamais = [];
-
-  // Primeiro passo: alocar os ramais que tem cabo manual definido
   (pop.pons || []).forEach(pon => {
+    let oltId = ponToOltMap[pon.index];
     (pon.ramais || []).forEach(ramal => {
-       if (ramal.cableId) {
-          const targetCable = rootCables.find(c => c.id === ramal.cableId);
-          if (targetCable) {
-             const fiberIndex = cableNextFiber[targetCable.id];
-             if (fiberIndex <= targetCable.fibers) {
-                 targetCable.fiberMapping[fiberIndex] = ramal.id;
-                 cableNextFiber[targetCable.id]++;
-             }
-          }
-       } else {
-          unassignedRamais.push(ramal.id);
+       if (!mappedRamais.has(ramal.id)) {
+           unassignedRamais.push({ id: ramal.id, oltId: oltId, cableId: ramal.cableId });
        }
     });
   });
 
-  // Segundo passo: distribui os ramais automáticos (sem cabo definido) sequencialmente
-  let cIndex = 0;
-  for (let ramalId of unassignedRamais) {
+  // Aloca novos ramais sequencialmente, mas respeitando o limite da OLT do cabo
+  for (let rObj of unassignedRamais) {
      let placed = false;
-     let attempts = 0;
-     while (!placed && attempts < rootCables.length) {
-         let currentCable = rootCables[cIndex % rootCables.length];
-         let fiberIndex = cableNextFiber[currentCable.id];
+     
+     // Filtra cabos elegíveis para este ramal (ou cabo forçado via ramal.cableId, ou cabos que casam com a OLT)
+     let eligibleCables = rootCables;
+     if (rObj.cableId) {
+         eligibleCables = rootCables.filter(c => c.id === rObj.cableId);
+     } else if (rObj.oltId) {
+         // Cabos que estao vazios de OLT ou vinculados a esta mesma OLT
+         eligibleCables = rootCables.filter(c => !c.oltId || c.oltId === rObj.oltId);
+     }
+
+     for (let cable of eligibleCables) {
+         let fiberIndex = cableNextFiber[cable.id];
+         // Avança até achar uma fibra realmente vazia (pois o usuário pode ter mapeado pulando fibras)
+         while(cable.fiberMapping[fiberIndex] && fiberIndex <= cable.fibers) {
+             fiberIndex++;
+         }
          
-         if (fiberIndex <= currentCable.fibers) {
-             currentCable.fiberMapping[fiberIndex] = ramalId;
-             cableNextFiber[currentCable.id]++;
+         if (fiberIndex <= cable.fibers) {
+             cable.fiberMapping[fiberIndex] = rObj.id;
+             cableNextFiber[cable.id] = fiberIndex + 1;
              placed = true;
+             break;
          }
-         
-         if (fiberIndex >= currentCable.fibers) {
-            cIndex++; // Vai pro proximo cabo se o atual encheu
-         }
-         attempts++;
      }
   }
 
