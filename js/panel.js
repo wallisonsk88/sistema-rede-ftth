@@ -220,10 +220,15 @@ function renderPOPProps(pop) {
 
   let globalIndexCounter = 1;
   pop.oltEquipments.forEach((olt, oltIndex) => {
+    const oltDetailsKey = `${pop.id}_olt_${olt.id || oltIndex}`;
+    const isOltOpen = window.openOltDetails && window.openOltDetails[oltDetailsKey] ? 'open' : '';
     html += `
-      <div style="margin: 15px 10px 5px 10px; font-size:11px; font-weight:bold; color:var(--primary); border-bottom:1px solid var(--border); padding-bottom:4px;">
-        ⚙️ ${olt.name} (${olt.ports} Portas)
-      </div>
+      <details class="olt-section-details" ${isOltOpen} ontoggle="window.openOltDetails = window.openOltDetails || {}; window.openOltDetails['${oltDetailsKey}'] = this.open" style="margin: 15px 0 5px 0; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+        <summary style="padding:12px; font-size:12px; font-weight:bold; color:var(--primary); cursor:pointer; outline:none; user-select:none; display:flex; justify-content:space-between; align-items:center;">
+          <span>⚙️ ${olt.name} (${olt.ports} Portas)</span>
+          <span style="font-size:10px; color:var(--text3);">▼ expandir</span>
+        </summary>
+        <div style="padding: 10px; border-top:1px solid var(--border);">
     `;
 
     for (let j = 1; j <= (parseInt(olt.ports) || 8); j++) {
@@ -388,6 +393,11 @@ function renderPOPProps(pop) {
         </div>`;
       }
     } // for j
+    
+    html += `
+        </div>
+      </details>
+    `;
   }); // forEach olt
 
   html += `</div>`;
