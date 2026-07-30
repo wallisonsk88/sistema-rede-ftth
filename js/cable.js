@@ -693,8 +693,12 @@ window.highlightRamal = function(popId, ramalId) {
                pathTrace = slicePathTo(c.path, [furthestCto.lat, furthestCto.lng]);
             }
 
-            // Usa a cor da rota/ramal (que agora herda da fibra tronco principal)
-            const physicalColor = routeColor;
+            // Usa a cor da fibra física NESTE cabo específico (para mostrar a mudança de cor nas derivações)
+            let physicalColor = routeColor;
+            if (typeof FIBER_COLORS !== 'undefined') {
+                const fColorObj = FIBER_COLORS[(fNum - 1) % FIBER_COLORS.length];
+                if (fColorObj) physicalColor = fColorObj.hex;
+            }
 
             // Cria a linha animada
             const traceLine = L.polyline(pathTrace, {
