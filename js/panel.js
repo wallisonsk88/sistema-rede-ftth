@@ -470,13 +470,22 @@ function renderCableProps(cable) {
        }
        if (currentCable && (currentCable.sourceType === 'pop' || currentCable.popId)) {
            const pop = STATE.olts.find(o => o.id === (currentCable.sourceId || currentCable.popId));
-           if (pop) {
-             rootPopId = pop.id;
-             pop.pons.forEach(pon => {
-               if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color }));
-             });
-           }
-       }
+            if (pop) {
+              rootPopId = pop.id;
+              let globalIndexCounter = 1;
+              let ponToOltMap = {};
+              (pop.oltEquipments || []).forEach(olt => {
+                let ports = parseInt(olt.ports) || 8;
+                for (let j = 1; j <= ports; j++) {
+                  ponToOltMap[globalIndexCounter++] = olt.id;
+                }
+              });
+              (pop.pons || []).forEach(pon => {
+                if (cable.oltId && ponToOltMap[pon.index] !== cable.oltId) return;
+                if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color }));
+              });
+            }
+        }
      }
   }
 
@@ -491,7 +500,7 @@ function renderCableProps(cable) {
         <label style="color:var(--primary); font-weight:bold;">Conectado na OLT (Opcional)</label>
         <select class="input-full" onchange="cableUpdate('${cable.id}', 'oltId', this.value)">
           <option value="">-- Listar todas as rotas do POP --</option>
-          ${STATE.olts.find(o => o.id === rootPopId).oltEquipments.map(o => `<option value="${o.id}" ${cable.oltId === o.id ? 'selected' : ''}>${o.name}</option>`).join('')}
+          ${(STATE.olts.find(o => o.id === rootPopId).oltEquipments || []).map(o => `<option value="${o.id}" ${cable.oltId === o.id ? 'selected' : ''}>${o.name}</option>`).join('')}
         </select>
         <div style="font-size:9px; color:var(--text3); margin-top:2px;">Selecione para filtrar os ramais abaixo apenas dessa OLT.</div>
       </div>
