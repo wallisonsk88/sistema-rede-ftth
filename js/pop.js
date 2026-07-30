@@ -25,7 +25,9 @@ function addPOP(lat, lng) {
   const obj = {
     id, lat, lng, name,
     outputPower: 4,
-    ponPorts: 8,
+    oltEquipments: [
+      { id: 'olt_' + Date.now(), name: 'OLT Principal', ports: 8 }
+    ],
     pons: [],
   };
   obj.layer = createPOPMarker(obj);
@@ -139,17 +141,64 @@ function removePonRota(popId, ponIndex) {
 }
 
 /** Atualiza propriedade de uma rota PON */
-function updatePonRota(popId, ponIndex, key, val) {
+function updatePonRota(popId, ponIndex, prop, value) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop) return;
 
   const pon = pop.pons.find(p => p.index === ponIndex);
-  if (pon) {
-    pon[key] = val;
-    saveLocal();
-    renderPanel();
-  }
+  if (!pon) return;
+  pon[prop] = value;
+  saveLocal();
+  renderPanel();
 }
+
+/** Adiciona uma nova OLT no POP */
+window.addOltEquipment = function(popId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (!pop) return;
+  
+  if (!pop.oltEquipments) {
+     pop.oltEquipments = [{ id: 'olt_default', name: 'OLT Principal', ports: pop.ponPorts || 8 }];
+  }
+  
+  pop.oltEquipments.push({
+    id: 'olt_' + Date.now(),
+    name: 'OLT ' + (pop.oltEquipments.length + 1),
+    ports: 8
+  });
+  
+  saveLocal();
+  renderPanel();
+  toast('✅ Nova OLT adicionada');
+};
+
+/** Remove uma OLT do POP */
+window.removeOltEquipment = function(popId, oltId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (!pop || !pop.oltEquipments) return;
+  
+  if (confirm('Tem certeza que deseja remover esta OLT? Suas portas e rotas podem ficar inacessíveis!')) {
+     pop.oltEquipments = pop.oltEquipments.filter(o => o.id !== oltId);
+     saveLocal();
+     renderPanel();
+     toast('🗑️ OLT Removida');
+  }
+};
+
+/** Atualiza dados da OLT */
+window.updateOltEquipment = function(popId, oltId, prop, value) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (!pop || !pop.oltEquipments) return;
+  
+  const olt = pop.oltEquipments.find(o => o.id === oltId);
+  if (!olt) return;
+  
+  if (prop === 'ports') value = parseInt(value) || 8;
+  
+  olt[prop] = value;
+  saveLocal();
+  renderPanel();
+};
 
 // ================================================================
 //  GERENCIAMENTO DE RAMAIS E CTOs

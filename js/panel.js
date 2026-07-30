@@ -92,7 +92,11 @@ function renderProps() {
 
 /** Renderiza as propriedades de um POP selecionado */
 function renderPOPProps(pop) {
-  const totalPons = pop.ponPorts || 8;
+  // Compatibilidade com estruturas antigas
+  if (!pop.oltEquipments) {
+     pop.oltEquipments = [{ id: 'olt_default', name: 'OLT Principal', ports: pop.ponPorts || 8 }];
+  }
+  const totalPons = pop.oltEquipments.reduce((sum, olt) => sum + (parseInt(olt.ports) || 8), 0);
   const configuredCount = pop.pons ? pop.pons.length : 0;
 
   let html = `
@@ -105,19 +109,11 @@ function renderPOPProps(pop) {
         onchange="popUpdate('${pop.id}','name',this.value)">
     </div>
 
-    <div class="fp-row">
-      <div class="fp-group">
-        <label class="fp-label">Portas PON</label>
-        <input class="fp-input" type="number" min="1" max="128"
-          value="${totalPons}"
-          onchange="popUpdate('${pop.id}','ponPorts',parseInt(this.value))">
-      </div>
-      <div class="fp-group">
-        <label class="fp-label">Potência TX (dBm)</label>
-        <input class="fp-input" type="number" step=".5"
-          value="${pop.outputPower || 4}"
-          onchange="popUpdate('${pop.id}','outputPower',parseFloat(this.value))">
-      </div>
+    <div class="fp-group">
+      <label class="fp-label">Potência TX (dBm)</label>
+      <input class="fp-input" type="number" step=".5"
+        value="${pop.outputPower || 4}"
+        onchange="popUpdate('${pop.id}','outputPower',parseFloat(this.value))">
     </div>
 
     <div class="fp-group">
@@ -182,6 +178,37 @@ function renderPOPProps(pop) {
     html += `</div></div>`;
   }
 
+  // ============================================================
+  // EQUIPAMENTOS OLT
+  // ============================================================
+  html += `
+  <div class="panel-section" style="margin-bottom:15px; border-radius:8px; background:var(--surface2); border:1px solid var(--border);">
+    <div class="panel-section-title" style="padding:10px 15px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase; color:var(--primary); margin:0; display:flex; justify-content:space-between; align-items:center;">
+      <span>🏢 Equipamentos OLT</span>
+      <button onclick="addOltEquipment('${pop.id}')" style="background:var(--primary); color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer;">+ Adicionar</button>
+    </div>
+    <div style="padding:10px 15px; display:flex; flex-direction:column; gap:10px;">
+  `;
+
+  pop.oltEquipments.forEach((olt, idx) => {
+    html += `
+      <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <input type="text" value="${olt.name}" onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'name', this.value)" style="font-size:12px; font-weight:bold; background:transparent; border:none; color:var(--text); outline:none; border-bottom:1px dashed var(--border); width:150px;">
+          <button onclick="removeOltEquipment('${pop.id}', '${olt.id}')" style="background:none; border:none; color:var(--red); cursor:pointer; font-size:12px;" title="Remover OLT">✕</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; font-size:11px; color:var(--text2);">
+          <span>Qtd. Portas PON:</span>
+          <select onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'ports', this.value)" style="background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:2px 4px;">
+            ${[2, 4, 8, 16, 32].map(n => `<option value="${n}" ${olt.ports == n ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div></div>`;
+
   html += `
   <div class="panel-section">
     <div class="panel-section-title">
@@ -191,179 +218,177 @@ function renderPOPProps(pop) {
       </span>
     </div>`;
 
-  for (let i = 1; i <= totalPons; i++) {
-    const pon = pop.pons ? pop.pons.find(p => p.index === i) : null;
+  let globalIndexCounter = 1;
+  pop.oltEquipments.forEach((olt, oltIndex) => {
+    html += `
+      <div style="margin: 15px 10px 5px 10px; font-size:11px; font-weight:bold; color:var(--primary); border-bottom:1px solid var(--border); padding-bottom:4px;">
+        ⚙️ ${olt.name} (${olt.ports} Portas)
+      </div>
+    `;
 
-    if (pon) {
-      // ── PON CONFIGURADA ──
-      const detailsKey = `${pop.id}_pon_${i}`;
-      const isOpen = window.openPonDetails && window.openPonDetails[detailsKey] ? 'open' : '';
-      
-      html += `
-      <details class="pon-card configured" ${isOpen} ontoggle="window.openPonDetails = window.openPonDetails || {}; window.openPonDetails['${detailsKey}'] = this.open" style="display:block; padding:0; border:1px solid var(--border); background:var(--bg); border-radius:8px; margin-bottom:10px;">
-        <summary class="pon-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px; cursor:pointer; list-style:none; outline:none; user-select:none;">
-          <div style="display:flex; align-items:center; gap:10px;">
-             <div class="pon-color-bar" style="background:${pon.color}; width:6px; height:24px; border-radius:3px;"></div>
-             <span class="pon-badge" style="background:${pon.color}20; color:${pon.color}; border:1px solid ${pon.color}44">
-               PON ${String(i).padStart(2, '0')}
-             </span>
-             <div style="display:flex; flex-direction:column;">
-               <span style="font-size:11px; font-weight:bold; color:var(--text);">${pon.oltName || 'OLT 1'}</span>
-               <span style="font-size:10px; font-weight:600; color:var(--text2);">${pon.rotaName} (${(pon.ramais||[]).length} ramais)</span>
-             </div>
-          </div>
-          <div style="display:flex; align-items:center; gap:10px;">
-             <span style="font-size:10px; color:var(--text3);">▼ expandir</span>
-             <button class="pon-remove-btn" onclick="removePonRota('${pop.id}', ${i})" title="Liberar porta">✕</button>
-          </div>
-        </summary>
-        <div class="pon-content" style="padding:0 10px 10px 10px; border-top:1px solid var(--border); margin-top:5px; padding-top:10px;">
-          <div class="pon-field-row">
-            <div class="pon-field" style="flex:1">
-              <label>Nome da OLT</label>
-              <input type="text" value="${pon.oltName || 'OLT 1'}"
-                onchange="updatePonRota('${pop.id}', ${i}, 'oltName', this.value)">
+    for (let j = 1; j <= (parseInt(olt.ports) || 8); j++) {
+      const i = globalIndexCounter++;
+      const localPonId = String(j).padStart(2, '0');
+      const pon = pop.pons ? pop.pons.find(p => p.index === i) : null;
+
+      if (pon) {
+        // ── PON CONFIGURADA ──
+        const detailsKey = `${pop.id}_pon_${i}`;
+        const isOpen = window.openPonDetails && window.openPonDetails[detailsKey] ? 'open' : '';
+        
+        html += `
+        <details class="pon-card configured" ${isOpen} ontoggle="window.openPonDetails = window.openPonDetails || {}; window.openPonDetails['${detailsKey}'] = this.open" style="display:block; padding:0; border:1px solid var(--border); background:var(--bg); border-radius:8px; margin-bottom:10px;">
+          <summary class="pon-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px; cursor:pointer; list-style:none; outline:none; user-select:none;">
+            <div style="display:flex; align-items:center; gap:10px;">
+               <div class="pon-color-bar" style="background:${pon.color}; width:6px; height:24px; border-radius:3px;"></div>
+               <span class="pon-badge" style="background:${pon.color}20; color:${pon.color}; border:1px solid ${pon.color}44">
+                 PON ${localPonId}
+               </span>
+               <div style="display:flex; flex-direction:column;">
+                 <span style="font-size:11px; font-weight:bold; color:var(--text);">${olt.name}</span>
+                 <span style="font-size:10px; font-weight:600; color:var(--text2);">${pon.rotaName} (${(pon.ramais||[]).length} ramais)</span>
+               </div>
             </div>
-            <div class="pon-field" style="flex:1">
-              <label>Nome da Rota</label>
-              <input type="text" value="${pon.rotaName}"
-                onchange="updatePonRota('${pop.id}', ${i}, 'rotaName', this.value)">
+            <div style="display:flex; align-items:center; gap:10px;">
+               <span style="font-size:10px; color:var(--text3);">▼ expandir</span>
+               <button class="pon-remove-btn" onclick="removePonRota('${pop.id}', ${i})" title="Liberar porta">✕</button>
             </div>
-          </div>
-          <div class="pon-field-row">
-            <div class="pon-field" style="flex:1">
-              <label>Cor da Rota</label>
-              <select onchange="updatePonRota('${pop.id}', ${i}, 'color', this.value)">
-                ${ROUTE_COLORS.map(c =>
-                  `<option value="${c.hex}" ${pon.color === c.hex ? 'selected' : ''}
-                    style="color:${c.hex}">${c.name}</option>`
-                ).join('')}
-              </select>
+          </summary>
+          <div class="pon-content" style="padding:0 10px 10px 10px; border-top:1px solid var(--border); margin-top:5px; padding-top:10px;">
+            <div class="pon-field-row">
+              <div class="pon-field" style="flex:1">
+                <label>Nome da OLT (Visualização)</label>
+                <input type="text" value="${olt.name}" disabled style="opacity:0.7;">
+              </div>
+              <div class="pon-field" style="flex:1">
+                <label>Nome da Rota</label>
+                <input type="text" value="${pon.rotaName}"
+                  onchange="updatePonRota('${pop.id}', ${i}, 'rotaName', this.value)">
+              </div>
             </div>
-          </div>
-          
-          <!-- INICIO RAMAIS -->
-          <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-              <span style="font-size:10px; font-weight:700; color:var(--text3)">🌿 RAMAIS (DISTRIBUIÇÃO)</span>
-              <button class="pon-remove-btn" style="font-size:10px; color:var(--primary); font-weight:600;" onclick="addRamal('${pop.id}', ${i})">+ Adicionar Ramal</button>
+            <div class="pon-field-row">
+              <div class="pon-field" style="flex:1">
+                <label>Cor da Rota</label>
+                <select onchange="updatePonRota('${pop.id}', ${i}, 'color', this.value)">
+                  ${ROUTE_COLORS.map(c =>
+                    `<option value="${c.hex}" ${pon.color === c.hex ? 'selected' : ''}
+                      style="color:${c.hex}">${c.name}</option>`
+                  ).join('')}
+                </select>
+              </div>
             </div>
             
-            ${(pon.ramais || []).map(ramal => {
-              // Calculamos o sinal das CTOs!
-              const cascadeResults = typeof calculateOpticalCascade === 'function' 
-                ? calculateOpticalCascade(pop.outputPower || 4, ramal.ctos || []) 
-                : [];
-              
-              let ramalHtml = `
-              <div style="background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; align-items:center;">
-                  <input type="text" value="${ramal.name}" style="background:transparent; border:none; color:var(--text); font-size:11px; font-weight:700; width:120px; padding:2px;" onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'name', this.value)">
-                  <div style="display:flex; gap:4px;">
-                    <button class="pon-remove-btn" onclick="highlightRamal('${pop.id}', '${ramal.id}')" title="Rastrear Ramal no mapa" style="color:var(--primary);">🔍</button>
-                    <button class="pon-remove-btn" onclick="removeRamal('${pop.id}', ${i}, '${ramal.id}')" title="Excluir Ramal">✕</button>
+            <!-- INICIO RAMAIS -->
+            <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="font-size:10px; font-weight:700; color:var(--text3)">🌿 RAMAIS (DISTRIBUIÇÃO)</span>
+                <button class="pon-remove-btn" style="font-size:10px; color:var(--primary); font-weight:600;" onclick="addRamal('${pop.id}', ${i})">+ Adicionar Ramal</button>
+              </div>
+              ${(pon.ramais || []).map((ramal, rIdx) => {
+                let ramalHtml = \`<div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
+                  <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <div style="flex:1;">
+                      <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:2px;">Nome do Ramal</label>
+                      <input type="text" value="\${ramal.name}" onchange="updateRamal('\${pop.id}', \${i}, '\${ramal.id}', 'name', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;">
+                    </div>
+                    <div>
+                      <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:2px;">Tipo</label>
+                      <select onchange="updateRamal('\${pop.id}', \${i}, '\${ramal.id}', 'type', this.value)" style="font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;">
+                        <option value="balanceado" \${ramal.type === 'balanceado' ? 'selected' : ''}>Balanc.</option>
+                        <option value="desbalanceado" \${ramal.type === 'desbalanceado' ? 'selected' : ''}>Desbalanc.</option>
+                      </select>
+                    </div>
+                    <div style="display:flex; align-items:flex-end;">
+                      <button onclick="removeRamal('\${pop.id}', \${i}, '\${ramal.id}')" style="background:var(--red); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px;" title="Remover Ramal">🗑️</button>
+                    </div>
                   </div>
-                </div>
+                  <div style="display:flex; gap:8px;">
+                    <div style="flex:1;">
+                      <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:2px;">Alocação FO Tronco (ex: 1)</label>
+                      <input type="number" value="\${ramal.fiberNum || ''}" onchange="allocateRamalToFiber('\${pop.id}', '\${ramal.id}', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;" placeholder="Livre">
+                    </div>
+                    <div>
+                      <button onclick="highlightRamal('\${pop.id}', '\${ramal.id}')" title="Destacar Rota no Mapa" style="background:none; border:none; cursor:pointer; font-size:16px; color:var(--primary); transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>
+                    </div>
+                  </div>
+                \`;
                 
-                <div class="pon-field-row" style="margin-bottom:8px;">
-                  <div class="pon-field" style="flex:1">
-                    <label>Cabo Tronco (Saída)</label>
-                    <select onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'cableId', this.value)">
-                      <option value="">Automático (Sequencial)</option>
-                      ${rootCables.map(c => `<option value="${c.id}" ${ramal.cableId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
-                    </select>
-                  </div>
-                </div>
-
-                <div class="pon-field-row" style="margin-bottom:8px;">
-                  <div class="pon-field" style="flex:1">
-                    <label>Topologia</label>
-                    <select onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'type', this.value)">
-                      <option value="desbalanceado" ${ramal.type === 'desbalanceado' ? 'selected' : ''}>Desbalanceada</option>
-                      <option value="balanceado" ${ramal.type === 'balanceado' ? 'selected' : ''}>Balanceada</option>
-                    </select>
-                  </div>
-                  <div class="pon-field" style="flex:1">
-                    <label>CTO (Splitter)</label>
-                    <select onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'attSplitter', this.value)">
-                      <option value="1:8" ${ramal.attSplitter === '1:8' ? 'selected' : ''}>1:8</option>
-                      <option value="1:16" ${ramal.attSplitter === '1:16' ? 'selected' : ''}>1:16</option>
-                    </select>
-                  </div>
-                </div>
+                const cascadeResults = window.calcOpticalPower ? window.calcOpticalPower(pop.outputPower, ramal) : [];
                 
-                <div class="pon-field-row" style="margin-bottom:8px; align-items:flex-end;">
-                  <div class="pon-field" style="flex:1">
-                    <label>Quantidade de CTOs</label>
-                    <input type="number" min="1" max="32" id="qtde_cto_${ramal.id}" placeholder="Ex: 5" value="${ramal.ctos ? ramal.ctos.length : ''}">
+                ramalHtml += \`
+                  <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
+                    <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:4px;">Planejamento de CTOs neste ramal (Simulação Automática)</label>
+                    <div style="display:flex; gap:4px; align-items:center;">
+                      <input type="number" id="qtde_cto_\${ramal.id}" value="\${ramal.ctos ? ramal.ctos.length : 8}" min="1" max="64" style="width:40px; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;">
+                      <span style="font-size:10px; color:var(--text2)">CTOs</span>
+                      <button class="btn-full primary" style="flex:1; margin-bottom:0;" onclick="generateRamalCTOs('\${pop.id}', \${i}, '\${ramal.id}', parseInt(document.getElementById('qtde_cto_\${ramal.id}').value))">🪄 Gerar / Calcular</button>
+                    </div>
                   </div>
-                  <button class="btn-full primary" style="flex:1; margin-bottom:0;" onclick="generateRamalCTOs('${pop.id}', ${i}, '${ramal.id}', parseInt(document.getElementById('qtde_cto_${ramal.id}').value))">🪄 Gerar / Calcular</button>
-                </div>
-              `;
-              
-              if(ramal.ctos && ramal.ctos.length > 0) {
-                 ramalHtml += `<div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
-                   <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px;">
-                     📦 CTOs Lançadas no Mapa: ${ramal.ctos.filter(c => c.lat).length} / ${ramal.ctos.length}
-                   </div>
-                   <div style="font-size:9px; color:var(--text2); display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; gap:4px;">
-                     <span style="flex:1">CTO</span>
-                     <span style="flex:1">Split Entrada</span>
-                     <span style="flex:1; text-align:right">Sinal</span>
-                   </div>
-                 `;
-                 
-                 ramal.ctos.forEach((cto, idx) => {
-                   const res = cascadeResults[idx];
-                   const rxVal = res ? parseFloat(res.rx) : 0;
-                   const isBad = rxVal < -25;
-                   const isWarn = rxVal > -15 || (rxVal < -23 && rxVal >= -25);
-                   const colorStyle = isBad ? 'color:var(--red)' : isWarn ? 'color:var(--yellow)' : 'color:var(--green)';
+                \`;
+                
+                if(ramal.ctos && ramal.ctos.length > 0) {
+                   ramalHtml += \`<div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
+                     <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:8px;">
+                       📦 CTOs Lançadas no Mapa: \${ramal.ctos.filter(c => c.lat).length} / \${ramal.ctos.length}
+                     </div>
+                     <div style="font-size:9px; color:var(--text2); display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700; gap:4px;">
+                       <span style="flex:1">CTO</span>
+                       <span style="flex:1">Split Entrada</span>
+                       <span style="flex:1; text-align:right">Sinal</span>
+                     </div>
+                   \`;
                    
-                   let ratioSelect = `<select style="font-size:10px; padding:2px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:3px; outline:none; width:100%;" onchange="updateCTORatio('${pop.id}', ${i}, '${ramal.id}', ${idx}, this.value)">`;
-                   if (ramal.type === 'desbalanceado') {
-                      Object.keys(SPLITTER_UNBAL).forEach(k => {
-                        ratioSelect += `<option value="${k}" ${cto.ratio === k ? 'selected' : ''}>${k}</option>`;
-                      });
-                   } else {
-                      Object.keys(SPLITTER_BAL).forEach(k => {
-                        ratioSelect += `<option value="${k}" ${cto.ratio === k ? 'selected' : ''}>${k}</option>`;
-                      });
-                   }
-                   ratioSelect += `</select>`;
-                   
-                   ramalHtml += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:10px; gap:4px;">
-                     <span style="display:flex; align-items:center; flex:1; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${cto.name}">
-                       ${cto.name}
-                     </span>
-                     <span style="flex:1">${ratioSelect}</span>
-                     <span style="flex:1; text-align:right; font-weight:700; ${colorStyle}">${res ? res.rx + ' dBm' : '--'}</span>
-                   </div>`;
-                 });
-                 ramalHtml += `</div>`;
-              }
+                   ramal.ctos.forEach((cto, idx) => {
+                     const res = cascadeResults[idx];
+                     const rxVal = res ? parseFloat(res.rx) : 0;
+                     const isBad = rxVal < -25;
+                     const isWarn = rxVal > -15 || (rxVal < -23 && rxVal >= -25);
+                     const colorStyle = isBad ? 'color:var(--red)' : isWarn ? 'color:var(--yellow)' : 'color:var(--green)';
+                     
+                     let ratioSelect = \`<select style="font-size:10px; padding:2px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:3px; outline:none; width:100%;" onchange="updateCTORatio('\${pop.id}', \${i}, '\${ramal.id}', \${idx}, this.value)">\`;
+                     if (ramal.type === 'desbalanceado') {
+                        Object.keys(SPLITTER_UNBAL).forEach(k => {
+                          ratioSelect += \`<option value="\${k}" \${cto.ratio === k ? 'selected' : ''}>\${k}</option>\`;
+                        });
+                     } else {
+                        Object.keys(SPLITTER_BAL).forEach(k => {
+                          ratioSelect += \`<option value="\${k}" \${cto.ratio === k ? 'selected' : ''}>\${k}</option>\`;
+                        });
+                     }
+                     ratioSelect += \`</select>\`;
+                     
+                     ramalHtml += \`<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:10px; gap:4px;">
+                       <span style="display:flex; align-items:center; flex:1; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="\${cto.name}">
+                         \${cto.name}
+                       </span>
+                       <span style="flex:1">\${ratioSelect}</span>
+                       <span style="flex:1; text-align:right; font-weight:700; \${colorStyle}">\${res ? res.rx + ' dBm' : '--'}</span>
+                     </div>\`;
+                   });
+                   ramalHtml += \`</div>\`;
+                }
+                
+                ramalHtml += \`</div>\`;
+                return ramalHtml;
+              }).join('')}
               
-              ramalHtml += `</div>`;
-              return ramalHtml;
-            }).join('')}
-            
+            </div>
+            <!-- FIM RAMAIS -->
           </div>
-          <!-- FIM RAMAIS -->
-
-        </div>
-      </details>`;
-    } else {
-      // ── PON LIVRE ──
-      html += `
-      <div class="pon-card free" onclick="addPonRota('${pop.id}', ${i})">
-        <div class="pon-color-bar" style="background:var(--border)"></div>
-        <div class="pon-content">
-          <span class="pon-badge free-badge">PON ${String(i).padStart(2, '0')}</span>
-          <span class="pon-free-text">Livre — clique para configurar rota</span>
-        </div>
-      </div>`;
-    }
-  }
+        </details>`;
+      } else {
+        // ── PON LIVRE ──
+        html += `
+        <div class="pon-card free" onclick="addPonRota('${pop.id}', ${i})">
+          <div class="pon-color-bar" style="background:var(--border)"></div>
+          <div class="pon-content">
+            <span class="pon-badge free-badge">PON ${localPonId}</span>
+            <span class="pon-free-text">Livre — clique para configurar rota</span>
+          </div>
+        </div>`;
+      }
+    } // for j
+  }); // forEach olt
 
   html += `</div>`;
 
