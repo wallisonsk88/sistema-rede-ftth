@@ -579,6 +579,8 @@ function renderCableProps(cable) {
 
   // Mapeia onde cada ramal está sendo usado em OUTROS cabos
   let ramalUsageMap = {};
+  
+  // 1. Pela alocação de fibra
   STATE.cables.forEach(c => {
      if (c.id === cable.id) return; // ignora o cabo atual
      if (c.fiberMapping) {
@@ -586,6 +588,18 @@ function renderCableProps(cable) {
            ramalUsageMap[c.fiberMapping[f]] = c.name || 'Outro Cabo';
         }
      }
+  });
+  
+  // 2. Pela amarração forçada no POP
+  STATE.olts.forEach(pop => {
+     (pop.pons || []).forEach(pon => {
+        (pon.ramais || []).forEach(ramal => {
+           if (ramal.cableId && ramal.cableId !== cable.id) {
+               const cInfo = STATE.cables.find(c => c.id === ramal.cableId);
+               ramalUsageMap[ramal.id] = cInfo ? (cInfo.name || 'Outro Cabo') : 'Outro Cabo';
+           }
+        });
+     });
   });
 
   // Busca CEOs conectadas a este cabo e pre-calcula distâncias
