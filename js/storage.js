@@ -23,6 +23,8 @@ function saveLocal() {
       outputPower: o.outputPower,
       ponPorts: o.ponPorts,
       pons: o.pons,
+      oltEquipments: o.oltEquipments,
+      obs: o.obs,
     })),
     cables: STATE.cables.map(c => ({
       id: c.id,
