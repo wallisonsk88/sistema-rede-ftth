@@ -2,15 +2,29 @@
  * report.js — Geração de Relatório de Quantitativo de Materiais (BOM)
  */
 
-function generateReportData() {
+function generateReportData(selectedOltId = '') {
   let totalCTOs = 0;
-  let totalCEOs = STATE.splices.length;
   let cableLengths = {}; // ex: { '6': 150.5, '12': 320.0 }
   let totalCable = 0;
+
+  // Mapeia PONs para suas OLTs
+  let ponToOltMap = {};
+  STATE.olts.forEach(pop => {
+      let gIndex = 1;
+      (pop.oltEquipments || []).forEach(olt => {
+          let ports = parseInt(olt.ports) || 8;
+          for(let i=1; i<=ports; i++) {
+              ponToOltMap[`${pop.id}_${gIndex++}`] = olt.id;
+          }
+      });
+  });
 
   // Conta as CTOs que de fato estão lançadas (possuem coordenadas)
   STATE.olts.forEach(pop => {
     (pop.pons || []).forEach(pon => {
+      const pOltId = ponToOltMap[`${pop.id}_${pon.index}`];
+      if (selectedOltId && pOltId !== selectedOltId) return;
+
       (pon.ramais || []).forEach(ramal => {
         (ramal.ctos || []).forEach(cto => {
           if (cto.lat && cto.lng) {
@@ -21,8 +35,33 @@ function generateReportData() {
     });
   });
 
+  // Determina quais cabos e CEOs pertencem à OLT selecionada
+  let allowedCables = new Set();
+  let allowedSplices = new Set();
+
+  if (selectedOltId) {
+      let queue = STATE.cables.filter(c => c.oltId === selectedOltId);
+      while(queue.length > 0) {
+          let currentCable = queue.shift();
+          if (allowedCables.has(currentCable.id)) continue;
+          allowedCables.add(currentCable.id);
+          
+          let connectedSplices = STATE.splices.filter(s => s.cableId === currentCable.id);
+          connectedSplices.forEach(sp => {
+              if (!allowedSplices.has(sp.id)) {
+                  allowedSplices.add(sp.id);
+                  let childCables = STATE.cables.filter(c => c.sourceType === 'splice' && c.sourceId === sp.id);
+                  queue.push(...childCables);
+              }
+          });
+      }
+  }
+
+  let totalCEOs = selectedOltId ? allowedSplices.size : STATE.splices.length;
+
   // Calcula metragem de cada cabo
   STATE.cables.forEach(cable => {
+    if (selectedOltId && !allowedCables.has(cable.id)) return;
     if (!cable.path || cable.path.length < 2) return;
     
     let lengthMeters = 0;
@@ -46,10 +85,25 @@ function generateReportData() {
   };
 }
 
-function openReportModal() {
-  const data = generateReportData();
+window.openReportModal = function(selectedOltId = '') {
+  const data = generateReportData(selectedOltId);
   
+  // Monta opções de OLTs para o filtro
+  let oltOptions = `<option value="">-- Todas as OLTs / Rede Completa --</option>`;
+  STATE.olts.forEach(pop => {
+      (pop.oltEquipments || []).forEach(olt => {
+          oltOptions += `<option value="${olt.id}" ${selectedOltId === olt.id ? 'selected' : ''}>${pop.name} - ${olt.name}</option>`;
+      });
+  });
+
   let html = `
+    <div style="margin-bottom:20px; background:var(--surface2); padding:15px; border-radius:12px; border:1px solid var(--border);">
+      <label style="font-size:12px; font-weight:700; color:var(--primary); display:block; margin-bottom:8px;">🎯 Filtrar Rede por OLT</label>
+      <select onchange="openReportModal(this.value)" style="width:100%; font-size:13px; padding:10px; background:var(--bg); border:1px solid var(--primary); color:var(--text); border-radius:8px; outline:none; cursor:pointer;">
+        ${oltOptions}
+      </select>
+    </div>
+
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
       <!-- CTO Card -->
       <div style="background:var(--surface2); border:1px solid rgba(255,255,255,0.05); padding:16px; border-radius:12px; display:flex; align-items:center; gap:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
