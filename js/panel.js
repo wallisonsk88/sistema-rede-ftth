@@ -207,7 +207,10 @@ function renderPOPProps(pop) {
              <span class="pon-badge" style="background:${pon.color}20; color:${pon.color}; border:1px solid ${pon.color}44">
                PON ${String(i).padStart(2, '0')}
              </span>
-             <span style="font-size:11px; font-weight:600; color:var(--text2);">${pon.rotaName} (${(pon.ramais||[]).length} ramais)</span>
+             <div style="display:flex; flex-direction:column;">
+               <span style="font-size:11px; font-weight:bold; color:var(--text);">${pon.oltName || 'OLT 1'}</span>
+               <span style="font-size:10px; font-weight:600; color:var(--text2);">${pon.rotaName} (${(pon.ramais||[]).length} ramais)</span>
+             </div>
           </div>
           <div style="display:flex; align-items:center; gap:10px;">
              <span style="font-size:10px; color:var(--text3);">▼ expandir</span>
@@ -215,10 +218,17 @@ function renderPOPProps(pop) {
           </div>
         </summary>
         <div class="pon-content" style="padding:0 10px 10px 10px; border-top:1px solid var(--border); margin-top:5px; padding-top:10px;">
-          <div class="pon-field">
-            <label>Nome da Rota</label>
-            <input type="text" value="${pon.rotaName}"
-              onchange="updatePonRota('${pop.id}', ${i}, 'rotaName', this.value)">
+          <div class="pon-field-row">
+            <div class="pon-field" style="flex:1">
+              <label>Nome da OLT</label>
+              <input type="text" value="${pon.oltName || 'OLT 1'}"
+                onchange="updatePonRota('${pop.id}', ${i}, 'oltName', this.value)">
+            </div>
+            <div class="pon-field" style="flex:1">
+              <label>Nome da Rota</label>
+              <input type="text" value="${pon.rotaName}"
+                onchange="updatePonRota('${pop.id}', ${i}, 'rotaName', this.value)">
+            </div>
           </div>
           <div class="pon-field-row">
             <div class="pon-field" style="flex:1">

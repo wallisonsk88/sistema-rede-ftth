@@ -113,6 +113,7 @@ function addPonRota(popId, ponIndex) {
 
   pop.pons.push({
     index: ponIndex,
+    oltName: 'OLT 1',
     rotaName: 'Rota ' + ponIndex,
     color: nextColor.hex,
     ramais: [],
