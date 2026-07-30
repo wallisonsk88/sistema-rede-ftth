@@ -274,6 +274,19 @@ function renderPOPProps(pop) {
                       <button onclick="removeRamal('${pop.id}', ${i}, '${ramal.id}')" style="background:var(--red); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px;" title="Remover Ramal">🗑️</button>
                     </div>
                   </div>
+                  <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <div style="flex:1;">
+                      <label style="font-size:9px; color:var(--primary); display:block; margin-bottom:2px; font-weight:bold;">Tubar no Cabo Tronco (Opcional):</label>
+                      <select onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'cableId', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;">
+                        <option value="">-- Automático (Qualquer Vinculado) --</option>
+                        ${(() => {
+                           const oltId = ponToOltMap[pon.index];
+                           const eligibleCables = popCables.filter(c => !c.oltId || c.oltId === oltId);
+                           return eligibleCables.map(c => `<option value="${c.id}" ${ramal.cableId === c.id ? 'selected' : ''}>${c.name || 'Cabo Tronco ' + c.fibers + ' FO'}</option>`).join('');
+                        })()}
+                      </select>
+                    </div>
+                  </div>
                   <div style="display:flex; gap:8px;">
                     <div style="flex:1;">
                       <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:2px;">Alocação FO Tronco (Somente Leitura)</label>

@@ -267,6 +267,14 @@ function updateRamal(popId, ponIndex, ramalId, key, val) {
     }
     saveLocal();
     if (key === 'cableId') {
+       // Se mudar o cabo alvo, tira do mapeamento atual para forçar o syncPopCables a realocar
+       STATE.cables.forEach(c => {
+           if (c.fiberMapping) {
+               for (let f in c.fiberMapping) {
+                   if (c.fiberMapping[f] === ramalId) delete c.fiberMapping[f];
+               }
+           }
+       });
        if (typeof syncPopCables === 'function') syncPopCables(popId);
     }
     renderPanel();
