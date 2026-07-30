@@ -302,7 +302,9 @@ function renderPOPProps(pop) {
                       <input type="text" value="${mappedFiberNum ? 'Fibra ' + mappedFiberNum : 'Livre'}" disabled style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none; opacity:0.7;" title="Alocação de fibra agora é feita na aba de Propriedades do Cabo!">
                     </div>
                     <div>
-                      <button onclick="highlightRamal('${pop.id}', '${ramal.id}')" title="Destacar Rota no Mapa" style="background:none; border:none; cursor:pointer; font-size:16px; color:var(--primary); transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>
+                      ${mappedFiberNum ? 
+                        `<button onclick="highlightRamal('${pop.id}', '${ramal.id}')" title="Destacar Rota no Mapa" style="background:none; border:none; cursor:pointer; font-size:16px; color:var(--primary); transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>` 
+                        : `<button disabled title="O ramal precisa estar tubado em um cabo para ser destacado no mapa" style="background:none; border:none; font-size:16px; color:var(--text3); opacity:0.5; cursor:not-allowed;">🔍</button>`}
                     </div>
                   </div>
                 `;
@@ -310,12 +312,14 @@ function renderPOPProps(pop) {
                 const cascadeResults = window.calcOpticalPower ? window.calcOpticalPower((olt.outputPower !== undefined ? olt.outputPower : pop.outputPower) || 4, ramal) : [];
                 
                 ramalHtml += `
-                  <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px;">
+                  <div style="margin-top:10px; border-top:1px dashed var(--border); padding-top:10px; opacity:${mappedFiberNum ? '1' : '0.6'};">
                     <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:4px;">Planejamento de CTOs neste ramal (Simulação Automática)</label>
                     <div style="display:flex; gap:4px; align-items:center;">
-                      <input type="number" id="qtde_cto_${ramal.id}" value="${ramal.ctos ? ramal.ctos.length : 8}" min="1" max="64" style="width:40px; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;">
+                      <input type="number" id="qtde_cto_${ramal.id}" value="${ramal.ctos ? ramal.ctos.length : 8}" min="1" max="64" style="width:40px; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;" ${mappedFiberNum ? '' : 'disabled'}>
                       <span style="font-size:10px; color:var(--text2)">CTOs</span>
-                      <button class="btn-full primary" style="flex:1; margin-bottom:0;" onclick="generateRamalCTOs('${pop.id}', ${i}, '${ramal.id}', parseInt(document.getElementById('qtde_cto_${ramal.id}').value))">🪄 Gerar / Calcular</button>
+                      ${mappedFiberNum ? 
+                      `<button class="btn-full primary" style="flex:1; margin-bottom:0;" onclick="generateRamalCTOs('${pop.id}', ${i}, '${ramal.id}', parseInt(document.getElementById('qtde_cto_${ramal.id}').value))">🪄 Gerar / Calcular</button>`
+                      : `<button class="btn-full secondary" style="flex:1; margin-bottom:0; background:var(--surface2); color:var(--text3);" disabled title="Tube este ramal num cabo para gerar CTOs">⚠️ Tubagem Pendente</button>`}
                     </div>
                   </div>
                 `;
