@@ -444,7 +444,17 @@ function renderCableProps(cable) {
      if (pop) {
        originName = 'POP: ' + pop.name;
        rootPopId = pop.id;
-       pop.pons.forEach(pon => {
+       let globalIndexCounter = 1;
+       let ponToOltMap = {};
+       (pop.oltEquipments || []).forEach(olt => {
+         let ports = parseInt(olt.ports) || 8;
+         for (let j = 1; j <= ports; j++) {
+           ponToOltMap[globalIndexCounter++] = olt.id;
+         }
+       });
+
+       (pop.pons || []).forEach(pon => {
+         if (cable.oltId && ponToOltMap[pon.index] !== cable.oltId) return;
          if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color }));
        });
      }
@@ -476,6 +486,16 @@ function renderCableProps(cable) {
       <input type="text" class="input-full" value="${cable.name}" onchange="cableUpdate('${cable.id}', 'name', this.value)">
     </div>
     <div style="font-size:10px; opacity:0.8; margin-bottom:10px;">${originName}</div>
+    ${rootPopId ? `
+      <div class="prop-group">
+        <label style="color:var(--primary); font-weight:bold;">Conectado na OLT (Opcional)</label>
+        <select class="input-full" onchange="cableUpdate('${cable.id}', 'oltId', this.value)">
+          <option value="">-- Listar todas as rotas do POP --</option>
+          ${STATE.olts.find(o => o.id === rootPopId).oltEquipments.map(o => `<option value="${o.id}" ${cable.oltId === o.id ? 'selected' : ''}>${o.name}</option>`).join('')}
+        </select>
+        <div style="font-size:9px; color:var(--text3); margin-top:2px;">Selecione para filtrar os ramais abaixo apenas dessa OLT.</div>
+      </div>
+    ` : ''}
     
     <div class="prop-group">
       <label>Capacidade (Fibras)</label>
