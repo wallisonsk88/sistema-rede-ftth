@@ -133,6 +133,15 @@ function renderPOPProps(pop) {
     </div>`;
 
   let globalIndexCounter = 1;
+  let ponToOltMap = {};
+  pop.oltEquipments.forEach(olt => {
+      let ports = parseInt(olt.ports) || 8;
+      for (let j = 1; j <= ports; j++) {
+          ponToOltMap[globalIndexCounter++] = olt.id;
+      }
+  });
+  globalIndexCounter = 1; // Reset it for the rendering loop
+
   pop.oltEquipments.forEach((olt, oltIndex) => {
     const oltDetailsKey = `${pop.id}_olt_${olt.id || oltIndex}`;
     const isOltOpen = window.openOltDetails && window.openOltDetails[oltDetailsKey] ? 'open' : '';
