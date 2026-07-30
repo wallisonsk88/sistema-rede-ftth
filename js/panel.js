@@ -577,6 +577,17 @@ function renderCableProps(cable) {
     clickDist = getDistanceAlongCable(STATE.clickedLatLng, cable.path);
   }
 
+  // Mapeia onde cada ramal está sendo usado em OUTROS cabos
+  let ramalUsageMap = {};
+  STATE.cables.forEach(c => {
+     if (c.id === cable.id) return; // ignora o cabo atual
+     if (c.fiberMapping) {
+        for (let f in c.fiberMapping) {
+           ramalUsageMap[c.fiberMapping[f]] = c.name || 'Outro Cabo';
+        }
+     }
+  });
+
   // Busca CEOs conectadas a este cabo e pre-calcula distâncias
   const cableSplices = STATE.splices
     .filter(s => s.cableId === cable.id)
@@ -626,7 +637,10 @@ function renderCableProps(cable) {
       // Fibra normal
       let options = `<option value="">-- Livre --</option>`;
       allRamais.forEach(r => {
-        options += `<option value="${r.id}" ${mappedRamalId === r.id ? 'selected' : ''}>${r.name}</option>`;
+        const isUsed = ramalUsageMap[r.id];
+        const isUsedText = isUsed ? ` (Usado: ${isUsed})` : '';
+        // Se estiver sendo usado em outro cabo, mostramos visualmente e desabilitamos para evitar conflito
+        options += `<option value="${r.id}" ${mappedRamalId === r.id ? 'selected' : ''} ${isUsed ? 'disabled' : ''}>${r.name}${isUsedText}</option>`;
       });
 
       html += `
