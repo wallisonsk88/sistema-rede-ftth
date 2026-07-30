@@ -227,6 +227,18 @@ function renderPOPProps(pop) {
                 <button class="pon-remove-btn" style="font-size:10px; color:var(--primary); font-weight:600;" onclick="addRamal('${pop.id}', ${i})">+ Adicionar Ramal</button>
               </div>
               ${(pon.ramais || []).map((ramal, rIdx) => {
+                let mappedFiberNum = '';
+                const popCables = STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === pop.id || c.popId === pop.id));
+                for (const pc of popCables) {
+                  for (const fNum in pc.fiberMapping) {
+                    if (pc.fiberMapping[fNum] === ramal.id) {
+                      mappedFiberNum = fNum;
+                      break;
+                    }
+                  }
+                  if (mappedFiberNum) break;
+                }
+
                 let ramalHtml = `<div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
                   <div style="display:flex; gap:8px; margin-bottom:8px;">
                     <div style="flex:1;">
@@ -246,8 +258,8 @@ function renderPOPProps(pop) {
                   </div>
                   <div style="display:flex; gap:8px;">
                     <div style="flex:1;">
-                      <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:2px;">Alocação FO Tronco (ex: 1)</label>
-                      <input type="number" value="${ramal.fiberNum || ''}" onchange="allocateRamalToFiber('${pop.id}', '${ramal.id}', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;" placeholder="Livre">
+                      <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:2px;">Alocação FO Tronco (Somente Leitura)</label>
+                      <input type="text" value="${mappedFiberNum ? 'Fibra ' + mappedFiberNum : 'Livre'}" disabled style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none; opacity:0.7;" title="Alocação de fibra agora é feita na aba de Propriedades do Cabo!">
                     </div>
                     <div>
                       <button onclick="highlightRamal('${pop.id}', '${ramal.id}')" title="Destacar Rota no Mapa" style="background:none; border:none; cursor:pointer; font-size:16px; color:var(--primary); transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>
