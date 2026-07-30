@@ -164,6 +164,17 @@ function renderPOPProps(pop) {
             <label style="font-size:10px; color:var(--text3);">Observações da OLT</label>
             <textarea onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'obs', this.value)" style="width:100%; height:40px; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px; resize:vertical;">${olt.obs || ''}</textarea>
           </div>
+          
+          <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
+            <label style="font-size:10px; color:var(--primary); font-weight:bold;">🔗 Cabo Tronco (Backbone) Vinculado</label>
+            <div style="font-size:9px; color:var(--text3); margin-bottom:4px;">Selecione o cabo que sairá desta OLT. Apenas rotas desta OLT irão para ele.</div>
+            <select onchange="window.linkCableToOlt('${pop.id}', '${olt.id}', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--surface2); border:1px solid var(--primary); color:var(--text); border-radius:4px; outline:none;">
+               <option value="">-- Nenhum / Livre --</option>
+               ${STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === pop.id || c.popId === pop.id)).map(c => 
+                  `<option value="${c.id}" ${c.oltId === olt.id ? 'selected' : ''}>${c.name || 'Cabo Tronco ' + c.fibers + ' FO'}</option>`
+               ).join('')}
+            </select>
+          </div>
         </div>
         <div style="padding: 10px;">
     `;
@@ -1244,3 +1255,25 @@ window.updateCTOField = function(popId, ponIndex, ramalId, ctoId, field, value) 
     renderPanel();
   }
 }
+
+window.linkCableToOlt = function(popId, oltId, cableId) {
+   const rootCables = STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === popId || c.popId === popId));
+   
+   // Primeiro, remove este oltId de todos os cabos (para garantir exclusividade se quisermos, 
+   // mas a regra é 1 Cabo = 1 OLT, então se ele escolher um cabo vazio, limpa)
+   if (!cableId) {
+      rootCables.forEach(c => {
+         if (c.oltId === oltId) c.oltId = null;
+      });
+   } else {
+      // Se ele escolheu um cabo, vinculamos ele.
+      const cable = STATE.cables.find(c => c.id === cableId);
+      if (cable) {
+          cable.oltId = oltId;
+      }
+   }
+   
+   if (typeof window.saveLocal === 'function') window.saveLocal();
+   if (typeof window.syncPopCables === 'function') window.syncPopCables(popId);
+   if (typeof window.renderPanel === 'function') window.renderPanel();
+};
