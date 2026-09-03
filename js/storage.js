@@ -5,10 +5,27 @@
 const urlParams = new URLSearchParams(window.location.search);
 const currentProjectId = urlParams.get('id');
 const STORAGE_KEY = currentProjectId ? `meganet_ftth_project_${currentProjectId}` : 'meganet_ftth_v2';
-let currentUser = null;
+const PROJECTS_LIST_KEY = 'meganet_projects_list';
 let saveTimeout = null;
 window.STATE_HISTORY = [];
 window.isUndoing = false;
+
+/** Atualiza o nome e data do projeto na lista do dashboard */
+function syncProjectMeta(projectName) {
+  if (!currentProjectId) return;
+  try {
+    const projects = JSON.parse(localStorage.getItem(PROJECTS_LIST_KEY)) || [];
+    const idx = projects.findIndex(p => p.id === currentProjectId);
+    if (idx !== -1) {
+      projects[idx].name = projectName;
+      projects[idx].updatedAt = new Date().toISOString();
+    } else {
+      // Projeto não está na lista ainda — adiciona
+      projects.push({ id: currentProjectId, name: projectName, updatedAt: new Date().toISOString() });
+    }
+    localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(projects));
+  } catch(e) {}
+}
 
 function saveLocal() {
   const data = {
@@ -58,7 +75,7 @@ function saveLocal() {
       ratio: c.ratio
     }))
   };
-  
+
   const currentStateJson = JSON.stringify(data);
 
   // Histórico de Desfazer (Undo)
@@ -73,34 +90,12 @@ function saveLocal() {
 
   try {
     localStorage.setItem(STORAGE_KEY, currentStateJson);
+    // Atualiza nome e data na lista do dashboard
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => syncProjectMeta(data.projectName), 1000);
   } catch (e) {
     console.error('Erro ao salvar localmente:', e);
   }
-
-  // Sincronização com a Nuvem (Supabase) via Debounce (1,5 segundos)
-  if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(async () => {
-    try {
-      if (typeof supabaseClient === 'undefined' || !currentProjectId || !currentUser) return;
-      const { error } = await supabaseClient
-        .from('ftth_projects')
-        .update({ name: data.projectName, data: data, updated_at: new Date() })
-        .eq('id', currentProjectId)
-        .eq('user_id', currentUser.id);
-      
-      if (error) {
-        if (error.code === '42P01') {
-          console.error('⚠️ Supabase: Tabela "ftth_projects" não existe. Crie a tabela no SQL Editor.');
-        } else {
-          console.error('Erro no Supabase:', error);
-        }
-      } else {
-        console.log('☁️ Projeto sincronizado com a nuvem com sucesso!');
-      }
-    } catch(err) {
-      console.error('Erro de rede ao salvar na nuvem:', err);
-    }
-  }, 1500);
 }
 
 /** Aplica um objeto de dados JSON ao Estado (STATE) */
@@ -131,69 +126,15 @@ function applyDataToState(data) {
   }, 500);
 }
 
-/** Tenta carregar da nuvem; se falhar, cai para o LocalStorage */
+/** Carrega o projeto do localStorage (substitui loadFromCloud) */
 async function loadFromCloud() {
   if (!currentProjectId) {
-     alert('Projeto não encontrado. Redirecionando para o painel...');
-     window.location.href = 'dashboard.html';
-     return;
+    alert('Projeto não encontrado. Redirecionando para o painel...');
+    window.location.href = 'dashboard.html';
+    return;
   }
-  
-  try {
-    if (typeof supabaseClient !== 'undefined') {
-      // Verifica Autenticação
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) {
-         window.location.href = 'login.html';
-         return;
-      }
-      currentUser = session.user;
-      
-      const { data, error } = await supabaseClient
-        .from('ftth_projects')
-        .select('data')
-        .eq('id', currentProjectId)
-        .eq('user_id', currentUser.id)
-        .maybeSingle();
-        
-      if (!error && data && data.data) {
-        const cloudData = data.data;
-        
-        // Anti-Data Loss: Verifica se o LocalStorage tem uma versão mais nova (caso o navegador fechou antes de salvar na nuvem)
-        const localJson = localStorage.getItem(STORAGE_KEY);
-        let useLocal = false;
-        if (localJson) {
-           try {
-              const localData = JSON.parse(localJson);
-              const localTime = localData.timestamp || 0;
-              const cloudTime = cloudData.timestamp || 0;
-              if (localTime > cloudTime) {
-                 useLocal = true;
-                 console.warn('⚠️ A versão LocalStorage é mais recente que a da Nuvem! Restaurando dados locais...');
-              }
-           } catch(e) {}
-        }
-        
-        if (useLocal) {
-            loadLocal();
-            // Dispara um novo save para forçar a nuvem a se atualizar com a versão local recuperada
-            setTimeout(() => { saveLocal(); }, 1500);
-            return;
-        }
 
-        console.log('☁️ Projeto carregado da Nuvem!');
-        applyDataToState(cloudData);
-        return;
-      } else if (error && error.code !== 'PGRST116') {
-        console.warn('Falha ao ler da nuvem (ou tabela não existe), tentando backup local.', error);
-      }
-    }
-  } catch (err) {
-    console.error('Erro de rede na inicialização.', err);
-  }
-  
-  // Fallback Local
-  console.log('💻 Carregando backup do navegador (local)...');
+  console.log('💻 Carregando projeto do navegador...');
   loadLocal();
 }
 
@@ -310,7 +251,7 @@ function clearAll(silent = false) {
   STATE.cables.forEach(c => { if (c.layer) map.removeLayer(c.layer); });
   if (typeof ctoMarkersLayer !== 'undefined') ctoMarkersLayer.clearLayers();
   if (typeof spliceMarkersLayer !== 'undefined') spliceMarkersLayer.clearLayers();
-  
+
   STATE.olts = [];
   STATE.cables = [];
   STATE.splices = [];
@@ -331,28 +272,28 @@ window.undoLastAction = function() {
     toast('Nenhuma ação para desfazer');
     return;
   }
-  
+
   // Remove o estado atual
   window.STATE_HISTORY.pop();
-  
+
   // Pega o estado anterior
   const previousStateJson = window.STATE_HISTORY[window.STATE_HISTORY.length - 1];
-  
+
   window.isUndoing = true;
-  
+
   try {
     const data = JSON.parse(previousStateJson);
     clearAll(true);
     applyDataToState(data);
-    
+
     if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
     if (typeof renderAllSplices === 'function') renderAllSplices();
-    
+
     toast('↩️ Ação desfeita!');
   } catch (e) {
     console.error('Erro ao desfazer ação:', e);
   } finally {
     window.isUndoing = false;
-    saveLocal(); 
+    saveLocal();
   }
 }
