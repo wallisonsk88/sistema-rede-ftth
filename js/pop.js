@@ -32,6 +32,27 @@ function buildPonToOltMap(pop) {
   return ponToOlt;
 }
 
+/**
+ * Informações de hierarquia de um ramal: POP, OLT, porta PON (numerada dentro da OLT), rota e ramal.
+ * Sempre lê os dados atuais, então renomear a OLT/rota/ramal reflete na rede toda.
+ */
+function getRamalInfo(ramalId) {
+  if (!ramalId) return null;
+  for (const pop of STATE.olts) {
+    for (const pon of pop.pons || []) {
+      const ramal = (pon.ramais || []).find(r => r.id === ramalId);
+      if (!ramal) continue;
+      const ponToOlt = buildPonToOltMap(pop);
+      const olt = (pop.oltEquipments || []).find(o => o.id === ponToOlt[pon.index]);
+      const firstIndex = olt ? Math.min(...Object.keys(ponToOlt).filter(k => ponToOlt[k] === olt.id).map(Number)) : 1;
+      const ponLabel = String(pon.index - firstIndex + 1).padStart(2, '0');
+      const oltName = olt ? olt.name : 'OLT ?';
+      return { pop, olt, oltName, pon, ponLabel, ramal, label: `${oltName} · PON ${ponLabel} · ${pon.rotaName} · ${ramal.name}` };
+    }
+  }
+  return null;
+}
+
 /** Adiciona um POP no mapa */
 function addPOP(lat, lng) {
   const id = 'pop_' + Date.now();

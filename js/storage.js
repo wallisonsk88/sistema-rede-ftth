@@ -103,6 +103,7 @@ function serializeState() {
 }
 
 function saveLocal() {
+  recomputeSignals(); // mantém cabos derivados sempre de acordo com a OLT e as fusões
   const data = serializeState();
 
   const currentStateJson = JSON.stringify(data);

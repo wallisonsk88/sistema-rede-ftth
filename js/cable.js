@@ -196,14 +196,29 @@ function slicePathTo(cablePath, latlng) {
   return newPath;
 }
 
-/** Conteúdo do tooltip do cabo (nome, fibras e comprimento) */
+/** Conteúdo do tooltip do cabo (nome, fibras, comprimento e rotas que passam nele) */
 function cableTooltipHtml(cable) {
+  const routes = new Set();
+  Object.values(cable.fiberMapping || {}).forEach(ramalId => {
+    const info = getRamalInfo(ramalId);
+    if (info) routes.add(`${info.oltName} · PON ${info.ponLabel} · ${info.pon.rotaName}`);
+  });
   return `
     <div style="text-align: center;">
       <b>${cable.name || 'Cabo'}</b><br>
       <span style="color: var(--primary);">🧵 ${cable.fibers} FO</span> | 📏 ${formatDist(calcPolylineLength(cable.path || []))}
+      ${[...routes].map(r => `<br><span style="font-size:10px;">${r}</span>`).join('')}
     </div>
   `;
+}
+
+/** Nome da fibra pelo código de cores (12 fibras por tubo quando o cabo tem mais de 12) */
+function fiberLabel(fiber, totalFibers) {
+  const color = FIBER_COLORS[(fiber - 1) % FIBER_COLORS.length];
+  if (totalFibers <= 12) return `Fibra ${fiber} (${color.name})`;
+  const tube = Math.ceil(fiber / 12);
+  const tubeColor = FIBER_COLORS[(tube - 1) % FIBER_COLORS.length];
+  return `Fibra ${fiber} · Tubo ${tube} (${tubeColor.name}) · ${color.name}`;
 }
 
 /** Cabos tronco que saem de um POP */
@@ -219,7 +234,7 @@ function renderCableOnMap(cableObj) {
     opacity: 0.9
   }).addTo(map);
 
-  pl.bindTooltip(cableTooltipHtml(cableObj), { sticky: true });
+  pl.bindTooltip(() => cableTooltipHtml(cableObj), { sticky: true });
 
   pl.on('click', ev => {
     L.DomEvent.stopPropagation(ev);
@@ -245,7 +260,6 @@ function renderCableOnMap(cableObj) {
     if (isGeomanEditingCableId === cableObj.id) {
        const latlngs = e.layer.getLatLngs();
        cableObj.path = latlngs.map(ll => [ll.lat, ll.lng]);
-       e.layer.setTooltipContent(cableTooltipHtml(cableObj));
     }
   });
 
@@ -335,11 +349,10 @@ function cableUpdate(id, key, val) {
     saveLocal();
     renderPanel();
 
-    if (cable.layer) cable.layer.setTooltipContent(cableTooltipHtml(cable));
   }
 }
 
-/** Aloca um ramal a uma fibra no cabo */
+/** Aloca um ramal a uma fibra do cabo tronco (só o tronco recebe escolha manual) */
 function setFiberMapping(cableId, fiberNumber, ramalId) {
   const cable = STATE.cables.find(c => c.id === cableId);
   if (cable) {
@@ -348,73 +361,79 @@ function setFiberMapping(cableId, fiberNumber, ramalId) {
     } else {
       delete cable.fiberMapping[fiberNumber];
     }
-
-    // Propaga a mudança para cabos filhos conectados nas CEOs
-    cascadeFiberMapping(cableId, fiberNumber, ramalId);
-
-    saveLocal();
+    saveLocal(); // recalcula a propagação para os cabos derivados
     renderPanel();
   }
 }
 
-function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
-  const splicesOnCable = STATE.splices.filter(s => s.cableId === cableId);
-  const cable = STATE.cables.find(c => c.id === cableId);
+/** Cabo tronco: sai direto do POP (os demais saem de uma CEO) */
+function isRootCable(cable) {
+  return cable.sourceType === 'pop' || !!cable.popId;
+}
 
-  splicesOnCable.forEach(splice => {
-    // Check if fiber is cut upstream of this splice
-    let isCutUpstream = false;
-    if (cable && typeof getDistanceAlongCable === 'function') {
-       const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], cable.path);
-       for (const otherSplice of splicesOnCable) {
-          if (otherSplice.id !== splice.id && otherSplice.fusions) {
-             const otherDist = getDistanceAlongCable([otherSplice.lat, otherSplice.lng], cable.path);
-             if (otherDist < thisSpliceDist) {
-                // If other splice uses this fiber, it's cut!
-                Object.values(otherSplice.fusions).forEach(fusions => {
-                   Object.values(fusions).forEach(f => {
-                      if (f == fiberNumber) isCutUpstream = true;
-                   });
-                });
-             }
-          }
-       }
-    }
+/** Fusão vinda de uma saída de splitter da CEO ('S1', 'S2'...) */
+function isSplitterOutput(src) {
+  return typeof src === 'string' && src.startsWith('S');
+}
 
-    // Se estiver cortada antes, o sinal (ramalId) que chega aqui é nulo.
-    const effectiveRamalId = isCutUpstream ? null : ramalId;
-
-    if (splice.fusions) {
-      Object.keys(splice.fusions).forEach(childCableId => {
-        const childCable = STATE.cables.find(c => c.id === childCableId);
-        if (childCable) {
-          Object.keys(splice.fusions[childCableId]).forEach(childFiberStr => {
-            const parentFiberNum = splice.fusions[childCableId][childFiberStr];
-
-            let isMatched = (parentFiberNum == fiberNumber);
-            if (typeof parentFiberNum === 'string' && parentFiberNum.startsWith('S')) {
-                if (splice.splitter && splice.splitter.inputFiber == fiberNumber) {
-                    isMatched = true;
-                }
-            }
-
-            if (isMatched) {
-              const childFiberNum = parseInt(childFiberStr);
-
-              if (effectiveRamalId) {
-                childCable.fiberMapping[childFiberNum] = effectiveRamalId;
-              } else {
-                delete childCable.fiberMapping[childFiberNum];
-              }
-
-              // Continua propagando (cascata)
-              cascadeFiberMapping(childCableId, childFiberNum, effectiveRamalId);
-            }
-          });
-        }
-      });
-    }
+/**
+ * Para cada fibra do cabo, a primeira CEO (a partir da origem do cabo) onde ela é cortada:
+ * fusionada para um cabo derivado (sangria) ou ligada na entrada do splitter.
+ * Retorna { [fibra]: { splice, dist } }.
+ */
+function getFiberCuts(cable) {
+  const cuts = {};
+  STATE.splices.filter(s => s.cableId === cable.id).forEach(sp => {
+    const dist = getDistanceAlongCable([sp.lat, sp.lng], cable.path);
+    const used = new Set();
+    Object.values(sp.fusions || {}).forEach(fus => Object.values(fus).forEach(src => {
+      if (!isSplitterOutput(src)) used.add(parseInt(src));
+    }));
+    if (sp.splitter && sp.splitter.inputFiber) used.add(parseInt(sp.splitter.inputFiber));
+    used.forEach(fiber => {
+      if (!cuts[fiber] || dist < cuts[fiber].dist) cuts[fiber] = { splice: sp, dist };
+    });
   });
+  return cuts;
+}
+
+/**
+ * Recalcula o sinal (ramal) de todas as fibras da rede a partir da OLT.
+ * Só os cabos tronco guardam a escolha do usuário; nos cabos derivados o ramal
+ * vem das fusões e splitters das CEOs. Uma fibra cortada numa CEO não leva
+ * sinal para as CEOs que ficam depois dela no mesmo cabo.
+ */
+function recomputeSignals() {
+  STATE.cables.forEach(c => {
+    if (!c.fiberMapping) c.fiberMapping = {};
+    if (!isRootCable(c)) c.fiberMapping = {};
+  });
+
+  const queue = STATE.cables.filter(isRootCable);
+  const visited = new Set();
+  while (queue.length) {
+    const cable = queue.shift();
+    if (visited.has(cable.id)) continue;
+    visited.add(cable.id);
+
+    const cuts = getFiberCuts(cable);
+    STATE.splices.filter(s => s.cableId === cable.id).forEach(sp => {
+      Object.entries(sp.fusions || {}).forEach(([childId, fus]) => {
+        const child = STATE.cables.find(c => c.id === childId);
+        if (!child) return;
+        Object.entries(fus).forEach(([childFiber, src]) => {
+          const parentFiber = isSplitterOutput(src) ? parseInt(sp.splitter && sp.splitter.inputFiber) : parseInt(src);
+          if (!parentFiber) return;
+          // Se a fibra já foi cortada numa CEO anterior, o sinal não chega nesta
+          const cut = cuts[parentFiber];
+          if (cut && cut.splice.id !== sp.id) return;
+          const ramalId = cable.fiberMapping[parentFiber];
+          if (ramalId) child.fiberMapping[childFiber] = ramalId;
+        });
+        queue.push(child);
+      });
+    });
+  }
 }
 
 /** Auto-mapeia as fibras dos cabos tronco que saem do POP, respeitando a escolha manual do cabo */
@@ -488,17 +507,7 @@ window.syncPopCables = function(popId) {
      }
   }
 
-  // Terceiro passo: Dispara a cascata (propagação pela árvore de fusões)
-  rootCables.forEach(cable => {
-    for (let i = 1; i <= cable.fibers; i++) {
-       const ramalId = cable.fiberMapping[i];
-       if (typeof cascadeFiberMapping === 'function') {
-           cascadeFiberMapping(cable.id, i, ramalId || null);
-       }
-    }
-  });
-
-  saveLocal();
+  saveLocal(); // propaga para os cabos derivados (recomputeSignals)
 }
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
@@ -568,29 +577,10 @@ window.highlightRamal = function(popId, ramalId) {
       }
 
       if (fibersWithRamal.length > 0) {
-         // Pega CEOs no cabo
-         const cableSplices = STATE.splices
-            .filter(s => s.cableId === c.id)
-            .map(s => ({ ...s, dist: getDistanceAlongCable([s.lat, s.lng], c.path) }));
+         const cuts = getFiberCuts(c);
 
          fibersWithRamal.forEach(fNum => {
-            let earliestCutSplice = null;
-            let minCutDist = Infinity;
-
-            for (const sp of cableSplices) {
-               if (sp.fusions) {
-                  for (const dCId in sp.fusions) {
-                     for (const dFib in sp.fusions[dCId]) {
-                         if (sp.fusions[dCId][dFib] == fNum) {
-                             if (sp.dist < minCutDist) {
-                                minCutDist = sp.dist;
-                                earliestCutSplice = sp;
-                             }
-                         }
-                     }
-                  }
-               }
-            }
+            const earliestCutSplice = cuts[fNum] ? cuts[fNum].splice : null;
 
             // Pega a CTO mais distante deste ramal neste cabo
             let furthestCto = null;

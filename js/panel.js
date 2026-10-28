@@ -513,7 +513,7 @@ function renderCableProps(cable) {
      const ponToOltMap = buildPonToOltMap(rootPop);
      (rootPop.pons || []).forEach(pon => {
        if (cable.oltId && ponToOltMap[pon.index] !== cable.oltId) return;
-       if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: `${pon.rotaName} - ${r.name}`, color: pon.color }));
+       if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: getRamalInfo(r.id).label, color: pon.color }));
      });
   }
 
@@ -523,7 +523,7 @@ function renderCableProps(cable) {
       <input type="text" class="input-full" value="${cable.name}" onchange="cableUpdate('${cable.id}', 'name', this.value)">
     </div>
     <div style="font-size:10px; opacity:0.8; margin-bottom:10px;">${originName}</div>
-    ${rootPopId ? `
+    ${rootPopId && isRootCable(cable) ? `
       <div class="prop-group">
         <label style="color:var(--primary); font-weight:bold;">Conectado na OLT (Opcional)</label>
         <select class="input-full" onchange="cableUpdate('${cable.id}', 'oltId', this.value)">
@@ -553,12 +553,13 @@ function renderCableProps(cable) {
     clickDist = getDistanceAlongCable(STATE.clickedLatLng, cable.path);
   }
 
-  // Mapeia onde cada ramal está sendo usado em OUTROS cabos
+  // Mapeia onde cada ramal está sendo usado em OUTROS cabos tronco
+  // (nos derivados ele chega por fusão, isso não é conflito)
   let ramalUsageMap = {};
 
   // 1. Pela alocação de fibra
   STATE.cables.forEach(c => {
-     if (c.id === cable.id) return; // ignora o cabo atual
+     if (c.id === cable.id || !isRootCable(c)) return;
      if (c.fiberMapping) {
         for (let f in c.fiberMapping) {
            ramalUsageMap[c.fiberMapping[f]] = c.name || 'Outro Cabo';
@@ -578,36 +579,20 @@ function renderCableProps(cable) {
      });
   });
 
-  // Busca CEOs conectadas a este cabo e pre-calcula distâncias
-  const cableSplices = STATE.splices
-    .filter(s => s.cableId === cable.id)
-    .map(s => ({ ...s, dist: getDistanceAlongCable([s.lat, s.lng], cable.path) }));
+  const cuts = getFiberCuts(cable);
+  const isRoot = isRootCable(cable);
+  const sourceSplice = isRoot ? null : STATE.splices.find(s => s.id === cable.sourceId);
+  const sourceCable = sourceSplice ? STATE.cables.find(c => c.id === sourceSplice.cableId) : null;
 
   for(let i=1; i<=cable.fibers; i++) {
     const cIdx = (i - 1) % FIBER_COLORS.length;
     const fColor = FIBER_COLORS[cIdx];
     const mappedRamalId = cable.fiberMapping[i] || '';
 
-    let earliestCutSplice = null;
-    let minCutDist = Infinity;
-
-    for (const sp of cableSplices) {
-       if (sp.fusions) {
-          for (const dCId in sp.fusions) {
-             for (const dFib in sp.fusions[dCId]) {
-                 if (sp.fusions[dCId][dFib] == i) {
-                     if (sp.dist < minCutDist) {
-                        minCutDist = sp.dist;
-                        earliestCutSplice = sp;
-                     }
-                 }
-             }
-          }
-       }
-    }
+    const earliestCutSplice = cuts[i] ? cuts[i].splice : null;
 
     // A fibra morre 1 metro após a CEO.
-    let isDeadAtClick = earliestCutSplice && (clickDist > minCutDist + 1);
+    let isDeadAtClick = earliestCutSplice && (clickDist > cuts[i].dist + 1);
 
     if (isDeadAtClick) {
       // Fibra morta (após a CEO) - SEM SELECTOR DE RAMAL
@@ -615,7 +600,7 @@ function renderCableProps(cable) {
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid #dc2626; opacity:0.8;">
           <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
           <div style="flex:1;">
-            <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
+            <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">${fiberLabel(i, cable.fibers)}</div>
             <div style="width:100%; font-size:11px; padding:4px; background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.4); color:#ef4444; border-radius:4px;">
               ✂️ Cortada (Sangria na ${earliestCutSplice.name})
             </div>
@@ -633,15 +618,33 @@ function renderCableProps(cable) {
         options += `<option value="${r.id}" ${mappedRamalId === r.id ? 'selected' : ''} ${isUsed ? 'disabled' : ''}>${r.name}${isUsedText}</option>`;
       });
 
+      // No tronco o usuário escolhe; no derivado a informação vem da fusão na CEO de origem
+      let fiberControl;
+      if (isRoot) {
+        fiberControl = `
+            <select style="width:100%; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;"
+                    onchange="setFiberMapping('${cable.id}', ${i}, this.value)">
+              ${options}
+            </select>`;
+      } else {
+        const src = sourceSplice && sourceSplice.fusions && sourceSplice.fusions[cable.id] ? sourceSplice.fusions[cable.id][i] : null;
+        const srcText = !src ? '' : isSplitterOutput(src)
+          ? `Splitter 1:${sourceSplice.splitter ? sourceSplice.splitter.outputs : '?'} · ${src.replace('S', 'OUT ')}`
+          : `F${src} do ${sourceCable ? sourceCable.name : 'cabo de origem'}`;
+        const info = getRamalInfo(mappedRamalId);
+        fiberControl = `
+            <div style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:${info ? 'var(--text)' : 'var(--text3)'};">
+              ${info ? info.label : (src ? 'Fusionada, mas a fibra de origem não tem rota' : 'Sem fusão — sem sinal')}
+              ${src ? `<div style="font-size:9px; color:var(--text3); margin-top:2px;">⬅️ ${sourceSplice.name}: ${srcText}</div>` : ''}
+            </div>`;
+      }
+
       html += `
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid var(--border);">
           <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
           <div style="flex:1;">
-            <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">Tubo/Fibra ${i} (${fColor.name})</div>
-            <select style="width:100%; font-size:11px; padding:4px; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;"
-                    onchange="setFiberMapping('${cable.id}', ${i}, this.value)">
-              ${options}
-            </select>
+            <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">${fiberLabel(i, cable.fibers)}</div>
+            ${fiberControl}
           </div>
           ${mappedRamalId && rootPopId ? `
             <div style="display:flex;">
@@ -1078,20 +1081,7 @@ window.updateSplitterInput = function(spliceId, fiberIndex) {
   splice.splitter.inputFiber = fiberIndex ? parseInt(fiberIndex) : null;
   saveLocal();
 
-  // Como mudamos a entrada do splitter, o ramal propagado por ele muda.
-  // Precisamos re-cascatear as fibras que estão conectadas nas saídas dele.
-  if (splice.fusions) {
-      Object.keys(splice.fusions).forEach(cableId => {
-          Object.keys(splice.fusions[cableId]).forEach(fIndex => {
-              const srcF = splice.fusions[cableId][fIndex];
-              if (typeof srcF === 'string' && srcF.startsWith('S')) {
-                  // Força a atualização do cascade dessa fibra
-                  window.setFusion(spliceId, cableId, fIndex, srcF);
-              }
-          });
-      });
-  }
-
+  // As saídas do splitter herdam o novo ramal automaticamente (recomputeSignals no saveLocal)
   renderPanel();
 }
 
@@ -1101,91 +1091,17 @@ window.setFusion = function(spliceId, destCableId, destFiber, srcFiber) {
       if (!splice.fusions) splice.fusions = {};
       if (!splice.fusions[destCableId]) splice.fusions[destCableId] = {};
 
-      const parentCable = STATE.cables.find(c => c.id === splice.cableId);
-      const childCable = STATE.cables.find(c => c.id === destCableId);
-
       if (srcFiber) {
-         if (typeof srcFiber === 'string' && srcFiber.startsWith('S')) {
-             splice.fusions[destCableId][destFiber] = srcFiber;
-         } else {
-             splice.fusions[destCableId][destFiber] = parseInt(srcFiber);
-         }
-
-         // Herdar Rota/Ramal automaticamente do cabo pai
-         if (parentCable && childCable) {
-            let effectiveRamalId = null;
-            let checkFiber = null;
-
-            if (typeof srcFiber === 'string' && srcFiber.startsWith('S')) {
-               if (splice.splitter && splice.splitter.inputFiber) {
-                  effectiveRamalId = parentCable.fiberMapping[splice.splitter.inputFiber];
-                  checkFiber = splice.splitter.inputFiber;
-               }
-            } else {
-               effectiveRamalId = parentCable.fiberMapping[parseInt(srcFiber)];
-               checkFiber = parseInt(srcFiber);
-            }
-
-            // Verifica se a fibra já foi cortada antes (upstream) nesta mesma linha de cabo
-            if (checkFiber && typeof getDistanceAlongCable === 'function') {
-               const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], parentCable.path);
-               const splicesOnCable = STATE.splices.filter(s => s.cableId === parentCable.id);
-               for (const otherSplice of splicesOnCable) {
-                  if (otherSplice.id !== splice.id && otherSplice.fusions) {
-                     const otherDist = getDistanceAlongCable([otherSplice.lat, otherSplice.lng], parentCable.path);
-                     if (otherDist < thisSpliceDist) {
-                        Object.values(otherSplice.fusions).forEach(fusions => {
-                           Object.values(fusions).forEach(f => {
-                              if (f == checkFiber || (typeof f === 'string' && f.startsWith('S') && otherSplice.splitter && otherSplice.splitter.inputFiber == checkFiber)) {
-                                 effectiveRamalId = null;
-                              }
-                           });
-                        });
-                     }
-                  }
-               }
-            }
-
-            if (effectiveRamalId) {
-               childCable.fiberMapping[destFiber] = effectiveRamalId;
-               if (typeof cascadeFiberMapping === 'function') {
-                  cascadeFiberMapping(destCableId, destFiber, effectiveRamalId);
-               }
-            } else {
-               delete childCable.fiberMapping[destFiber];
-               if (typeof cascadeFiberMapping === 'function') {
-                  cascadeFiberMapping(destCableId, destFiber, null);
-               }
-            }
-         }
+         splice.fusions[destCableId][destFiber] = isSplitterOutput(srcFiber) ? srcFiber : parseInt(srcFiber);
       } else {
          delete splice.fusions[destCableId][destFiber];
-
-         // Limpa a herança se desfazer a fusão
-         if (childCable) {
-            delete childCable.fiberMapping[destFiber];
-            if (typeof cascadeFiberMapping === 'function') {
-               cascadeFiberMapping(destCableId, destFiber, null);
-            }
-         }
       }
-      saveLocal();
+      saveLocal(); // o cabo derivado herda o ramal da OLT pela fusão (recomputeSignals)
       toast('🔗 Matriz de fusão atualizada!');
-
-      // Se houver roubo de fibra, precisamos recalcular os cabos filhos a frente
-      // Para garantir a integridade total do sinal no tronco, recalculamos a partir da origem do tronco
-      if (parentCable && typeof cascadeFiberMapping === 'function') {
-          // Re-cascateia todas as fibras do tronco para corrigir CEOs downstream
-          for(let i=1; i<=parentCable.fibers; i++) {
-              if (parentCable.fiberMapping[i]) {
-                  cascadeFiberMapping(parentCable.id, i, parentCable.fiberMapping[i]);
-              }
-          }
-      }
-
       renderPanel();
    }
 }
+
 
 window.updateSpliceField = function(spliceId, field, value) {
   const splice = STATE.splices.find(s => s.id === spliceId);
@@ -1233,7 +1149,7 @@ function renderCTOProps(cto, pop, pon, ramal) {
     </div>
 
     <div style="font-size:11px; color:var(--text2); margin-bottom:15px;">
-      Hierarquia: <b>${pop.name}</b> ➡️ ${pon.rotaName} ➡️ ${ramal.name}
+      Hierarquia: <b>${pop.name}</b> ➡️ ${(getRamalInfo(ramal.id) || {}).oltName} ➡️ PON ${(getRamalInfo(ramal.id) || {}).ponLabel} ➡️ ${pon.rotaName} ➡️ ${ramal.name}
     </div>
 
     <div class="fp-group" style="margin-bottom: 20px; background:var(--bg3); padding:10px; border-radius:6px;">
