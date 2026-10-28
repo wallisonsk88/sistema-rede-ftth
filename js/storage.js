@@ -62,9 +62,9 @@ window.addEventListener('beforeunload', e => {
   }
 });
 
-function saveLocal() {
-  const data = {
-    timestamp: Date.now(),
+/** Converte o estado atual em um objeto simples (sem camadas do Leaflet) */
+function serializeState() {
+  return {
     projectName: document.getElementById('projectName').value,
     nextOLTNum: STATE.nextOLTNum,
     olts: STATE.olts.map(o => ({
@@ -98,18 +98,12 @@ function saveLocal() {
       fusions: s.fusions,
       splitter: s.splitter,
       obs: s.obs
-    })),
-    ctos: STATE.ctos.map(c => ({
-      id: c.id,
-      name: c.name,
-      lat: c.lat,
-      lng: c.lng,
-      cableId: c.cableId,
-      portCount: c.portCount,
-      fiberIndex: c.fiberIndex,
-      ratio: c.ratio
     }))
   };
+}
+
+function saveLocal() {
+  const data = serializeState();
 
   const currentStateJson = JSON.stringify(data);
 
@@ -135,7 +129,6 @@ function applyDataToState(data) {
   document.getElementById('projectName').value = data.projectName || 'Meu Projeto de Rede';
   STATE.nextOLTNum = data.nextOLTNum || 1;
   STATE.splices = data.splices || [];
-  STATE.ctos = data.ctos || [];
 
   (data.olts || []).forEach(o => {
     o.layer = createPOPMarker(o);
@@ -190,48 +183,9 @@ async function loadFromCloud() {
 /** Exporta o projeto como arquivo JSON */
 function exportProject() {
   const data = {
-    projectName: document.getElementById('projectName').value,
+    ...serializeState(),
     version: '2.0',
     exportedAt: new Date().toISOString(),
-    nextOLTNum: STATE.nextOLTNum,
-    olts: STATE.olts.map(o => ({
-      id: o.id,
-      lat: o.lat,
-      lng: o.lng,
-      name: o.name,
-      outputPower: o.outputPower,
-      ponPorts: o.ponPorts,
-      pons: o.pons,
-      oltEquipments: o.oltEquipments,
-      obs: o.obs,
-    })),
-    cables: STATE.cables.map(c => ({
-      id: c.id,
-      name: c.name,
-      popId: c.popId,
-      sourceType: c.sourceType,
-      sourceId: c.sourceId,
-      oltId: c.oltId,
-      path: c.path,
-      fibers: c.fibers,
-      fiberMapping: c.fiberMapping,
-    })),
-    splices: STATE.splices.map(s => ({
-      id: s.id,
-      name: s.name,
-      lat: s.lat,
-      lng: s.lng,
-      cableId: s.cableId,
-      fusions: s.fusions
-    })),
-    ctos: STATE.ctos.map(c => ({
-      id: c.id,
-      name: c.name,
-      lat: c.lat,
-      lng: c.lng,
-      cableId: c.cableId,
-      portCount: c.portCount
-    }))
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -252,26 +206,12 @@ function importProject(event) {
     try {
       const data = JSON.parse(e.target.result);
       clearAll(true);
-      document.getElementById('projectName').value = data.projectName || 'Projeto Importado';
-      STATE.nextOLTNum = data.nextOLTNum || 1;
-      STATE.splices = data.splices || [];
-      STATE.ctos = data.ctos || [];
-
-      (data.olts || []).forEach(o => {
-        o.layer = createPOPMarker(o);
-        STATE.olts.push(o);
-      });
-
-      (data.cables || []).forEach(c => {
-        STATE.cables.push(c);
-        if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
-      });
+      applyDataToState({ ...data, projectName: data.projectName || 'Projeto Importado' });
 
       updateStatusBar();
       renderPanel();
       if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
       if (typeof renderAllSplices === 'function') renderAllSplices();
-      setTimeout(fitBounds, 300);
       saveLocal();
       toast('📂 Projeto importado!');
     } catch (err) {
@@ -292,7 +232,6 @@ function clearAll(silent = false) {
   STATE.olts = [];
   STATE.cables = [];
   STATE.splices = [];
-  STATE.ctos = [];
   STATE.selectedId = null;
   STATE.nextOLTNum = 1;
 

@@ -18,6 +18,20 @@ const ROUTE_COLORS = [
   { hex: '#84cc16', name: 'Lima' },
 ];
 
+/**
+ * Mapeia o índice global de cada porta PON para a OLT dona dela.
+ * As portas são numeradas em sequência: OLT 1 = 1..N, OLT 2 = N+1.., etc.
+ */
+function buildPonToOltMap(pop) {
+  const ponToOlt = {};
+  let globalIndex = 1;
+  (pop.oltEquipments || []).forEach(olt => {
+    const ports = parseInt(olt.ports) || 8;
+    for (let j = 1; j <= ports; j++) ponToOlt[globalIndex++] = olt.id;
+  });
+  return ponToOlt;
+}
+
 /** Adiciona um POP no mapa */
 function addPOP(lat, lng) {
   const id = 'pop_' + Date.now();
@@ -82,13 +96,13 @@ function popUpdate(id, key, val) {
   const pop = STATE.olts.find(o => o.id === id);
   if (pop) {
     pop[key] = val;
-    
+
     // Atualiza imediatamente a etiqueta visual (DOM) se a propriedade for 'name'
     if (key === 'name') {
       const lbl = document.getElementById('pop_lbl_' + id);
       if (lbl) lbl.textContent = val;
     }
-    
+
     saveLocal();
     renderPanel();
   }
@@ -115,7 +129,6 @@ function addPonRota(popId, ponIndex) {
 
   pop.pons.push({
     index: ponIndex,
-    oltName: 'OLT 1',
     rotaName: 'Rota ' + ponIndex,
     color: nextColor.hex,
     ramais: [],
@@ -132,7 +145,7 @@ function removePonRota(popId, ponIndex) {
   if (!pop) return;
 
   pop.pons = pop.pons.filter(p => p.index !== ponIndex);
-  
+
   if (typeof syncPopCables === 'function') syncPopCables(popId);
 
   saveLocal();
@@ -156,17 +169,17 @@ function updatePonRota(popId, ponIndex, prop, value) {
 window.addOltEquipment = function(popId) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop) return;
-  
+
   if (!pop.oltEquipments) {
      pop.oltEquipments = [{ id: 'olt_default', name: 'OLT Principal', ports: pop.ponPorts || 8 }];
   }
-  
+
   pop.oltEquipments.push({
     id: 'olt_' + Date.now(),
     name: 'OLT ' + (pop.oltEquipments.length + 1),
     ports: 8
   });
-  
+
   saveLocal();
   renderPanel();
   toast('✅ Nova OLT adicionada');
@@ -176,7 +189,7 @@ window.addOltEquipment = function(popId) {
 window.removeOltEquipment = function(popId, oltId) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop || !pop.oltEquipments) return;
-  
+
   if (confirm('Tem certeza que deseja remover esta OLT? Suas portas e rotas podem ficar inacessíveis!')) {
      pop.oltEquipments = pop.oltEquipments.filter(o => o.id !== oltId);
      saveLocal();
@@ -189,13 +202,13 @@ window.removeOltEquipment = function(popId, oltId) {
 window.updateOltEquipment = function(popId, oltId, prop, value) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop || !pop.oltEquipments) return;
-  
+
   const olt = pop.oltEquipments.find(o => o.id === oltId);
   if (!olt) return;
-  
+
   if (prop === 'ports') value = parseInt(value) || 8;
   if (prop === 'outputPower') value = parseFloat(value) || 0;
-  
+
   olt[prop] = value;
   saveLocal();
   renderPanel();
@@ -211,9 +224,9 @@ function addRamal(popId, ponIndex) {
   if (!pop) return;
   const pon = pop.pons.find(p => p.index === ponIndex);
   if (!pon) return;
-  
+
   if (!pon.ramais) pon.ramais = [];
-  
+
   const ramalId = 'ramal_' + Date.now();
   pon.ramais.push({
     id: ramalId,
@@ -222,7 +235,7 @@ function addRamal(popId, ponIndex) {
     attSplitter: '1:8',    // atendimento padrao
     ctos: []
   });
-  
+
   if (typeof syncPopCables === 'function') syncPopCables(popId);
 
   saveLocal();
@@ -236,9 +249,9 @@ function removeRamal(popId, ponIndex, ramalId) {
   if (!pop) return;
   const pon = pop.pons.find(p => p.index === ponIndex);
   if (!pon) return;
-  
+
   pon.ramais = pon.ramais.filter(r => r.id !== ramalId);
-  
+
   if (typeof syncPopCables === 'function') syncPopCables(popId);
 
   saveLocal();
@@ -262,7 +275,7 @@ function updateRamal(popId, ponIndex, ramalId, key, val) {
        ramal.ctos.forEach(c => {
          c.type = val;
          // reseta ratio pro default do tipo
-         c.ratio = val === 'desbalanceado' ? '10/90' : '1:4'; 
+         c.ratio = val === 'desbalanceado' ? '10/90' : '1:4';
        });
     }
     saveLocal();
@@ -284,16 +297,16 @@ function updateRamal(popId, ponIndex, ramalId, key, val) {
 /** Configura e gera a lista de CTOs do Ramal (Cálculo Automático) */
 function generateRamalCTOs(popId, ponIndex, ramalId, numCtos) {
   if (!numCtos || numCtos < 1) return toast('⚠️ Digite uma quantidade válida de CTOs');
-  
+
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop) return;
   const pon = pop.pons.find(p => p.index === ponIndex);
   const ramal = pon.ramais.find(r => r.id === ramalId);
-  
+
   const defaultRatios = ['10/90', '15/85', '20/80', '25/75', '30/70', '40/60', '50/50'];
-  
+
   if (!ramal.ctos) ramal.ctos = [];
-  
+
   if (ramal.ctos.length > numCtos) {
      // Trunca mantendo apenas as primeiras CTOs
      ramal.ctos = ramal.ctos.slice(0, numCtos);
@@ -301,13 +314,13 @@ function generateRamalCTOs(popId, ponIndex, ramalId, numCtos) {
      // Preenche o restante
      for(let i = ramal.ctos.length; i < numCtos; i++) {
         let r = defaultRatios[0];
-        
+
         if (ramal.type === 'desbalanceado') {
-          if(i === numCtos - 1 && numCtos > 1) r = '50/50'; 
+          if(i === numCtos - 1 && numCtos > 1) r = '50/50';
         } else {
-          r = '1:4'; 
+          r = '1:4';
         }
-        
+
         ramal.ctos.push({
           id: 'cto_' + Date.now() + '_' + i,
           name: 'CTO ' + String(i+1).padStart(2, '0'),
@@ -317,7 +330,7 @@ function generateRamalCTOs(popId, ponIndex, ramalId, numCtos) {
         });
      }
   }
-  
+
   saveLocal();
   renderPanel();
   toast('✅ ' + numCtos + ' CTOs geradas. Ajuste as taxas se necessário.');
@@ -328,7 +341,7 @@ function updateCTORatio(popId, ponIndex, ramalId, ctoIdx, ratioVal) {
   const pop = STATE.olts.find(o => o.id === popId);
   const pon = pop.pons.find(p => p.index === ponIndex);
   const ramal = pon.ramais.find(r => r.id === ramalId);
-  
+
   if(ramal && ramal.ctos[ctoIdx]) {
     ramal.ctos[ctoIdx].ratio = ratioVal;
     saveLocal();
@@ -341,7 +354,7 @@ function updateCTOAttSplitter(popId, ponIndex, ramalId, ctoIdx, attVal) {
   const pop = STATE.olts.find(o => o.id === popId);
   const pon = pop.pons.find(p => p.index === ponIndex);
   const ramal = pon.ramais.find(r => r.id === ramalId);
-  
+
   if(ramal && ramal.ctos[ctoIdx]) {
     ramal.ctos[ctoIdx].attSplitter = attVal;
     saveLocal();

@@ -94,12 +94,10 @@ async function createNewProject() {
   const updatedAt = new Date().toISOString();
   const initialData = {
     projectName: name,
-    timestamp: Date.now(),
     nextOLTNum: 1,
     olts: [],
     cables: [],
-    splices: [],
-    ctos: []
+    splices: []
   };
 
   try {

@@ -31,9 +31,3 @@ function calcPolylineLength(pts) {
   }
   return len;
 }
-
-/** Retorna o ponto do meio de uma polyline */
-function midPointOfPolyline(pts) {
-  if (pts.length === 0) return [0, 0];
-  return pts[Math.floor(pts.length / 2)];
-}

@@ -39,11 +39,16 @@ function startCable(popId, lat, lng) {
 /** Inicia o desenho do cabo a partir de qualquer origem */
 function startCableExt(sourceType, sourceId, lat, lng) {
   if (currentCablePolyline) clearCableDraw();
-  
+
   currentCableSourceType = sourceType;
   currentCableSourceId = sourceId;
   currentCablePoints = [[lat, lng]];
-  
+  createCableDrawLines();
+  toast('🔌 Cabo iniciado. Clique no mapa para traçar.');
+}
+
+/** Cria as linhas temporárias do desenho (traçado + linha que segue o mouse) */
+function createCableDrawLines() {
   currentCablePolyline = L.polyline(currentCablePoints, {
     color: '#38bdf8', // Azul claro chamativo para o desenho
     weight: 4,
@@ -60,7 +65,6 @@ function startCableExt(sourceType, sourceId, lat, lng) {
   }).addTo(map);
 
   map.on('mousemove', onCableMouseMove);
-  toast('🔌 Cabo iniciado. Clique no mapa para traçar.');
 }
 
 function onCableMouseMove(e) {
@@ -74,49 +78,33 @@ function onCableMouseMove(e) {
 window.resumeCableDraw = function(cableId) {
   const cable = STATE.cables.find(c => c.id === cableId);
   if (!cable) return;
-  
+
   if (currentCablePolyline) clearCableDraw();
-  
+
   setTool('cable'); // Muda para a ferramenta de cabo e reseta estados
-  
+
   // Agora preenchemos o estado de desenho
   currentCableSourceType = cable.sourceType;
   currentCableSourceId = cable.sourceId;
   currentEditingCableId = cable.id;
   currentCablePoints = [...cable.path]; // Começa com os pontos existentes
-  
-  currentCablePolyline = L.polyline(currentCablePoints, {
-    color: '#38bdf8',
-    weight: 4,
-    opacity: 0.9,
-    interactive: false
-  }).addTo(map);
-
-  currentCableCursorLine = L.polyline([], {
-    color: '#38bdf8',
-    weight: 4,
-    dashArray: '5, 10',
-    opacity: 0.6,
-    interactive: false
-  }).addTo(map);
+  createCableDrawLines();
 
   closeMobilePanel(); // Fecha painel lateral no mobile para focar no mapa
-  
-  map.on('mousemove', onCableMouseMove);
   toast('🔌 Continuando traçado do cabo. Clique para adicionar mais pontos.');
 }
 
 /** Adiciona um ponto ao cabo atual */
 function cableAddPoint(lat, lng) {
   if (!currentCableSourceId) return toast('⚠️ Clique numa Origem (POP/CEO) para iniciar o cabo!');
-  
+
   if (currentCablePoints.length > 0) {
     const lastPt = currentCablePoints[currentCablePoints.length - 1];
     const dist = map.distance([lastPt[0], lastPt[1]], [lat, lng]);
     // Previne duplo clique ou pontos no mesmo lugar (ex: dist < 1 metro)
     if (dist < 1) return;
   }
-  
+
   currentCablePoints.push([lat, lng]);
   currentCablePolyline.setLatLngs(currentCablePoints);
 }
@@ -127,7 +115,7 @@ function finishCable() {
     clearCableDraw();
     return;
   }
-  
+
   if (currentEditingCableId) {
     // Atualiza cabo existente
     const cable = STATE.cables.find(c => c.id === currentEditingCableId);
@@ -148,7 +136,7 @@ function finishCable() {
     }
     return;
   }
-  
+
   // Cria novo cabo
   const id = 'cable_' + Date.now();
   const obj = {
@@ -160,19 +148,19 @@ function finishCable() {
     fibers: 12,          // Capacidade padrão
     fiberMapping: {}     // { "1": "ramalId" }
   };
-  
+
   STATE.cables.push(obj);
   clearCableDraw();
-  
+
   // Renderiza no mapa
   renderCableOnMap(obj);
-  
+
   if (currentCableSourceType === 'pop') {
      if (typeof syncPopCables === 'function') syncPopCables(currentCableSourceId);
   } else {
      saveLocal();
   }
-  
+
   setTool('select');
   selectElement(id);
   toast('✅ Cabo criado com sucesso!');
@@ -191,97 +179,48 @@ function clearCableDraw() {
 
 /** Calcula a distancia de um ponto projetado ao longo de um cabo */
 function getDistanceAlongCable(latlng, cablePath) {
-  if (!cablePath || cablePath.length < 2) return 0;
-  
-  const pt = map.latLngToLayerPoint(latlng);
-  let minDistanceSq = Infinity;
-  let closestLayerPt = null;
-  let closestSegmentIndex = 0;
+  const closest = findClosestOnPath(latlng, cablePath);
+  if (!closest) return 0;
 
-  for (let i = 0; i < cablePath.length - 1; i++) {
-    const p1 = map.latLngToLayerPoint(cablePath[i]);
-    const p2 = map.latLngToLayerPoint(cablePath[i + 1]);
-    
-    // Funcoes do cto.js
-    const projPt = getClosestPointOnSegment(pt, p1, p2);
-    const sqDist = dist2(pt, projPt);
-    
-    if (sqDist < minDistanceSq) {
-      minDistanceSq = sqDist;
-      closestLayerPt = projPt;
-      closestSegmentIndex = i;
-    }
-  }
-
-  if (!closestLayerPt) return 0;
-
-  let distToPt = 0;
-  for (let i = 0; i < closestSegmentIndex; i++) {
-    distToPt += map.distance(cablePath[i], cablePath[i+1]);
-  }
-  const snapLatLng = map.layerPointToLatLng(closestLayerPt);
-  distToPt += map.distance(cablePath[closestSegmentIndex], snapLatLng);
-
-  return distToPt;
+  const upToSegment = cablePath.slice(0, closest.segmentIndex + 1);
+  return calcPolylineLength(upToSegment) + map.distance(cablePath[closest.segmentIndex], closest.latlng);
 }
 
 /** Corta o path do cabo até o ponto especificado e retorna um novo array de coordenadas */
 function slicePathTo(cablePath, latlng) {
-  const pt = map.latLngToLayerPoint(latlng);
-  let minDistanceSq = Infinity;
-  let closestLayerPt = null;
-  let closestSegmentIndex = 0;
+  const closest = findClosestOnPath(latlng, cablePath);
+  if (!closest) return cablePath;
 
-  for (let i = 0; i < cablePath.length - 1; i++) {
-    const p1 = map.latLngToLayerPoint(cablePath[i]);
-    const p2 = map.latLngToLayerPoint(cablePath[i + 1]);
-    
-    const projPt = getClosestPointOnSegment(pt, p1, p2);
-    const sqDist = dist2(pt, projPt);
-    
-    if (sqDist < minDistanceSq) {
-      minDistanceSq = sqDist;
-      closestLayerPt = projPt;
-      closestSegmentIndex = i;
-    }
-  }
-  
-  if (!closestLayerPt) return cablePath;
-  
-  const newPath = [];
-  for (let i = 0; i <= closestSegmentIndex; i++) {
-     newPath.push(cablePath[i]);
-  }
-  const snapLatLng = map.layerPointToLatLng(closestLayerPt);
-  newPath.push([snapLatLng.lat, snapLatLng.lng]);
+  const newPath = cablePath.slice(0, closest.segmentIndex + 1);
+  newPath.push([closest.latlng.lat, closest.latlng.lng]);
   return newPath;
+}
+
+/** Conteúdo do tooltip do cabo (nome, fibras e comprimento) */
+function cableTooltipHtml(cable) {
+  return `
+    <div style="text-align: center;">
+      <b>${cable.name || 'Cabo'}</b><br>
+      <span style="color: var(--primary);">🧵 ${cable.fibers} FO</span> | 📏 ${formatDist(calcPolylineLength(cable.path || []))}
+    </div>
+  `;
+}
+
+/** Cabos tronco que saem de um POP */
+function getPopRootCables(popId) {
+  return STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === popId || c.popId === popId));
 }
 
 /** Renderiza um cabo já salvo no estado */
 function renderCableOnMap(cableObj) {
-  let distance = 0;
-  if (cableObj.path && cableObj.path.length > 1) {
-    for (let i = 0; i < cableObj.path.length - 1; i++) {
-      distance += map.distance(cableObj.path[i], cableObj.path[i+1]);
-    }
-  }
-  let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
-
   const pl = L.polyline(cableObj.path, {
     color: '#cbd5e1', // Cinza claro para contrastar com o fundo escuro
     weight: 4,
     opacity: 0.9
   }).addTo(map);
-  
-  const tooltipHtml = `
-    <div style="text-align: center;">
-      <b>${cableObj.name || 'Cabo'}</b><br>
-      <span style="color: var(--primary);">🧵 ${cableObj.fibers} FO</span> | 📏 ${distStr}
-    </div>
-  `;
-  
-  pl.bindTooltip(tooltipHtml, { sticky: true });
-  
+
+  pl.bindTooltip(cableTooltipHtml(cableObj), { sticky: true });
+
   pl.on('click', ev => {
     L.DomEvent.stopPropagation(ev);
     if (STATE.tool === 'eraser') {
@@ -306,26 +245,10 @@ function renderCableOnMap(cableObj) {
     if (isGeomanEditingCableId === cableObj.id) {
        const latlngs = e.layer.getLatLngs();
        cableObj.path = latlngs.map(ll => [ll.lat, ll.lng]);
-       
-       // Atualiza a distância no tooltip
-       let distance = 0;
-       if (cableObj.path && cableObj.path.length > 1) {
-         for (let i = 0; i < cableObj.path.length - 1; i++) {
-           distance += map.distance(cableObj.path[i], cableObj.path[i+1]);
-         }
-       }
-       let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
-       
-       const tooltipHtml = `
-         <div style="text-align: center;">
-           <b>${cableObj.name || 'Cabo'}</b><br>
-           <span style="color: var(--primary);">🧵 ${cableObj.fibers} FO</span> | 📏 ${distStr}
-         </div>
-       `;
-       e.layer.setTooltipContent(tooltipHtml);
+       e.layer.setTooltipContent(cableTooltipHtml(cableObj));
     }
   });
-  
+
   cableObj.layer = pl;
 }
 
@@ -355,7 +278,7 @@ function toggleGeomanEditCable(id) {
      isGeomanEditingCableId = id;
      document.body.classList.add('editing-cable');
      map.doubleClickZoom.disable(); // duplo clique passa a finalizar a edição
-     
+
      // Remove pontos duplicados para evitar bugs de nós sobrepostos (causados por duplo clique)
      if (cable.path && cable.path.length > 0) {
        const cleanedPath = [cable.path[0]];
@@ -387,7 +310,7 @@ function removeCable(id) {
   const cIndex = STATE.cables.findIndex(c => c.id === id);
   if (cIndex === -1) return;
   const cable = STATE.cables[cIndex];
-  
+
   if (isGeomanEditingCableId === id) {
     isGeomanEditingCableId = null;
     document.body.classList.remove('editing-cable');
@@ -396,9 +319,9 @@ function removeCable(id) {
 
   if (cable.layer) map.removeLayer(cable.layer);
   STATE.cables.splice(cIndex, 1);
-  
+
   if (STATE.selectedId === id) STATE.selectedId = null;
-  
+
   saveLocal();
   renderPanel();
   toast('🗑️ Cabo removido');
@@ -411,24 +334,8 @@ function cableUpdate(id, key, val) {
     cable[key] = val;
     saveLocal();
     renderPanel();
-    
-    if (cable.layer) {
-      let distance = 0;
-      if (cable.path && cable.path.length > 1) {
-        for (let i = 0; i < cable.path.length - 1; i++) {
-          distance += map.distance(cable.path[i], cable.path[i+1]);
-        }
-      }
-      let distStr = distance > 1000 ? (distance/1000).toFixed(2) + ' km' : Math.round(distance) + ' m';
-      
-      const tooltipHtml = `
-        <div style="text-align: center;">
-          <b>${cable.name || 'Cabo'}</b><br>
-          <span style="color: var(--primary);">🧵 ${cable.fibers} FO</span> | 📏 ${distStr}
-        </div>
-      `;
-      cable.layer.setTooltipContent(tooltipHtml);
-    }
+
+    if (cable.layer) cable.layer.setTooltipContent(cableTooltipHtml(cable));
   }
 }
 
@@ -441,10 +348,10 @@ function setFiberMapping(cableId, fiberNumber, ramalId) {
     } else {
       delete cable.fiberMapping[fiberNumber];
     }
-    
+
     // Propaga a mudança para cabos filhos conectados nas CEOs
     cascadeFiberMapping(cableId, fiberNumber, ramalId);
-    
+
     saveLocal();
     renderPanel();
   }
@@ -453,7 +360,7 @@ function setFiberMapping(cableId, fiberNumber, ramalId) {
 function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
   const splicesOnCable = STATE.splices.filter(s => s.cableId === cableId);
   const cable = STATE.cables.find(c => c.id === cableId);
-  
+
   splicesOnCable.forEach(splice => {
     // Check if fiber is cut upstream of this splice
     let isCutUpstream = false;
@@ -483,7 +390,7 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
         if (childCable) {
           Object.keys(splice.fusions[childCableId]).forEach(childFiberStr => {
             const parentFiberNum = splice.fusions[childCableId][childFiberStr];
-            
+
             let isMatched = (parentFiberNum == fiberNumber);
             if (typeof parentFiberNum === 'string' && parentFiberNum.startsWith('S')) {
                 if (splice.splitter && splice.splitter.inputFiber == fiberNumber) {
@@ -493,13 +400,13 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
 
             if (isMatched) {
               const childFiberNum = parseInt(childFiberStr);
-              
+
               if (effectiveRamalId) {
                 childCable.fiberMapping[childFiberNum] = effectiveRamalId;
               } else {
                 delete childCable.fiberMapping[childFiberNum];
               }
-              
+
               // Continua propagando (cascata)
               cascadeFiberMapping(childCableId, childFiberNum, effectiveRamalId);
             }
@@ -514,15 +421,15 @@ function cascadeFiberMapping(cableId, fiberNumber, ramalId) {
 window.syncPopCables = function(popId) {
   const pop = STATE.olts.find(o => o.id === popId);
   if (!pop) return;
-  
-  const rootCables = STATE.cables.filter(c => (c.sourceType === 'pop' || c.popId) && (c.sourceId === popId || c.popId === popId));
-  
+
+  const rootCables = getPopRootCables(popId);
+
   // NUNCA limpa mapeamento! Isso deletava as escolhas manuais que o usuário fez no painel do cabo!
   // Em vez disso, vamos apenas verificar quais ramais já estão mapeados e quais fibras estão livres.
 
   let mappedRamais = new Set();
   let cableNextFiber = {};
-  
+
   rootCables.forEach(cable => {
     if (!cable.fiberMapping) cable.fiberMapping = {};
     for (let i = 1; i <= cable.fibers; i++) {
@@ -539,14 +446,7 @@ window.syncPopCables = function(popId) {
   });
 
   // Mapa de OLT do PON para sabermos a quem o ramal pertence
-  let globalIndexCounter = 1;
-  let ponToOltMap = {};
-  (pop.oltEquipments || []).forEach(olt => {
-    let ports = parseInt(olt.ports) || 8;
-    for (let j = 1; j <= ports; j++) {
-      ponToOltMap[globalIndexCounter++] = olt.id;
-    }
-  });
+  const ponToOltMap = buildPonToOltMap(pop);
 
   // Pega ramais não mapeados ainda (que o usuário acabou de criar)
   let unassignedRamais = [];
@@ -562,7 +462,7 @@ window.syncPopCables = function(popId) {
   // Aloca novos ramais sequencialmente, mas respeitando o limite da OLT do cabo
   for (let rObj of unassignedRamais) {
      let placed = false;
-     
+
      // Filtra cabos elegíveis para este ramal (ou cabo forçado via ramal.cableId, ou cabos que casam com a OLT)
      let eligibleCables = rootCables;
      if (rObj.cableId) {
@@ -578,7 +478,7 @@ window.syncPopCables = function(popId) {
          while(cable.fiberMapping[fiberIndex] && fiberIndex <= cable.fibers) {
              fiberIndex++;
          }
-         
+
          if (fiberIndex <= cable.fibers) {
              cable.fiberMapping[fiberIndex] = rObj.id;
              cableNextFiber[cable.id] = fiberIndex + 1;
@@ -635,7 +535,7 @@ window.highlightRamal = function(popId, ramalId) {
 
   // Descobre qual fibra do cabo tronco que sai do POP alimenta este ramal (para usar a cor dela)
   let rootFiberNum = null;
-  const rootCables = STATE.cables.filter(c => c.sourceType === 'pop' && c.sourceId === popId);
+  const rootCables = getPopRootCables(popId);
   for (const rc of rootCables) {
       if (rc.fiberMapping) {
          for (let fn in rc.fiberMapping) {
@@ -647,7 +547,7 @@ window.highlightRamal = function(popId, ramalId) {
       }
       if (rootFiberNum) break;
   }
-  
+
   if (rootFiberNum) {
       const fiberColorObj = FIBER_COLORS[(rootFiberNum - 1) % FIBER_COLORS.length];
       if (fiberColorObj) routeColor = fiberColorObj.hex;
@@ -672,7 +572,7 @@ window.highlightRamal = function(popId, ramalId) {
          const cableSplices = STATE.splices
             .filter(s => s.cableId === c.id)
             .map(s => ({ ...s, dist: getDistanceAlongCable([s.lat, s.lng], c.path) }));
-         
+
          fibersWithRamal.forEach(fNum => {
             let earliestCutSplice = null;
             let minCutDist = Infinity;
@@ -691,11 +591,11 @@ window.highlightRamal = function(popId, ramalId) {
                   }
                }
             }
-            
+
             // Pega a CTO mais distante deste ramal neste cabo
             let furthestCto = null;
             let maxCtoDist = -1;
-            
+
             if (ramalObj && ramalObj.ctos) {
                 ramalObj.ctos.forEach(cto => {
                     if (cto.cableId === c.id && cto.lat && cto.lng) {
@@ -725,10 +625,10 @@ window.highlightRamal = function(popId, ramalId) {
 
             // Cria a linha animada
             const traceLine = L.polyline(pathTrace, {
-               color: physicalColor, 
-               weight: 6, 
-               opacity: 1, 
-               dashArray: '10, 15', 
+               color: physicalColor,
+               weight: 6,
+               opacity: 1,
+               dashArray: '10, 15',
                className: 'cable-flow',
                interactive: false
             }).addTo(map);

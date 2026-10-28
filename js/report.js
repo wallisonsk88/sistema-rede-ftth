@@ -8,15 +8,10 @@ function generateReportData(selectedOltId = '') {
   let totalCable = 0;
 
   // Mapeia PONs para suas OLTs
-  let ponToOltMap = {};
+  const ponToOltMap = {};
   STATE.olts.forEach(pop => {
-      let gIndex = 1;
-      (pop.oltEquipments || []).forEach(olt => {
-          let ports = parseInt(olt.ports) || 8;
-          for(let i=1; i<=ports; i++) {
-              ponToOltMap[`${pop.id}_${gIndex++}`] = olt.id;
-          }
-      });
+      const popMap = buildPonToOltMap(pop);
+      for (const idx in popMap) ponToOltMap[`${pop.id}_${idx}`] = popMap[idx];
   });
 
   // Conta as CTOs que de fato estão lançadas (possuem coordenadas)
@@ -45,7 +40,7 @@ function generateReportData(selectedOltId = '') {
           let currentCable = queue.shift();
           if (allowedCables.has(currentCable.id)) continue;
           allowedCables.add(currentCable.id);
-          
+
           let connectedSplices = STATE.splices.filter(s => s.cableId === currentCable.id);
           connectedSplices.forEach(sp => {
               if (!allowedSplices.has(sp.id)) {
@@ -63,13 +58,8 @@ function generateReportData(selectedOltId = '') {
   STATE.cables.forEach(cable => {
     if (selectedOltId && !allowedCables.has(cable.id)) return;
     if (!cable.path || cable.path.length < 2) return;
-    
-    let lengthMeters = 0;
-    for (let i = 0; i < cable.path.length - 1; i++) {
-      const p1 = L.latLng(cable.path[i][0], cable.path[i][1]);
-      const p2 = L.latLng(cable.path[i+1][0], cable.path[i+1][1]);
-      lengthMeters += p1.distanceTo(p2);
-    }
+
+    const lengthMeters = calcPolylineLength(cable.path);
 
     const fo = cable.fibers || 0;
     if (!cableLengths[fo]) cableLengths[fo] = 0;
@@ -87,7 +77,7 @@ function generateReportData(selectedOltId = '') {
 
 window.openReportModal = function(selectedOltId = '') {
   const data = generateReportData(selectedOltId);
-  
+
   // Monta opções de OLTs para o filtro
   let oltOptions = `<option value="">-- Todas as OLTs / Rede Completa --</option>`;
   STATE.olts.forEach(pop => {
@@ -125,13 +115,13 @@ window.openReportModal = function(selectedOltId = '') {
         </div>
       </div>
     </div>
-    
+
     <h4 style="margin:0 0 12px 0; font-size:13px; color:var(--text); font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Metragem de Cabos</h4>
     <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
   `;
 
   const cableTypes = Object.keys(data.cableLengths).sort((a,b) => parseInt(a) - parseInt(b));
-  
+
   if (cableTypes.length > 0) {
     cableTypes.forEach(fo => {
       const meters = data.cableLengths[fo];
@@ -145,7 +135,7 @@ window.openReportModal = function(selectedOltId = '') {
         </div>
       `;
     });
-    
+
     html += `
         <div style="padding:16px; background:var(--surface2); display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:10px;">
@@ -183,12 +173,12 @@ function closeReportModal() {
 
 function copyReport() {
   const data = generateReportData();
-  
+
   let text = `📊 RELATÓRIO DE MATERIAIS - PROJETO FTTH\n`;
   text += `----------------------------------------\n`;
   text += `CTOs: ${data.totalCTOs} unidades\n`;
   text += `CEOs (Emendas): ${data.totalCEOs} unidades\n\n`;
-  
+
   text += `CABOS ÓPTICOS:\n`;
   const cableTypes = Object.keys(data.cableLengths).sort((a,b) => parseInt(a) - parseInt(b));
   cableTypes.forEach(fo => {

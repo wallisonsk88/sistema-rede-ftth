@@ -19,14 +19,14 @@ function preparePlaceCTO(popId, ramalId, cableId, fiberIndex) {
   if (ponIndex === -1) return;
 
   placingRamalContext = { popId, ramalId, ponIndex, cableId, fiberIndex };
-  
+
   setTool('cto_place');
   toast('📦 Clique no cabo para lançar as CTOs (ESC para sair)');
 }
 
 /** Calcula distância ao quadrado entre dois pontos X,Y (pixels) */
-function dist2(v, w) { 
-  return Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2); 
+function dist2(v, w) {
+  return Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
 }
 
 /** Encontra o ponto (L.Point) mais próximo de p num segmento v-w */
@@ -38,33 +38,40 @@ function getClosestPointOnSegment(p, v, w) {
   return L.point(v.x + t * (w.x - v.x), v.y + t * (w.y - v.y));
 }
 
-/** Retorna a coordenada com Snap (imã) e a distância em pixels até o cabo */
-function snapToCable(lat, lng, cablePath) {
-  if (!cablePath || cablePath.length < 2) return null;
-  
-  const pt = map.latLngToLayerPoint([lat, lng]);
+/**
+ * Encontra o ponto do traçado mais próximo de uma coordenada.
+ * Retorna { segmentIndex, latlng, distancePx } ou null se o traçado tiver menos de 2 pontos.
+ */
+function findClosestOnPath(latlng, path) {
+  if (!path || path.length < 2) return null;
+
+  const pt = map.latLngToLayerPoint(latlng);
   let minDistanceSq = Infinity;
   let closestLayerPt = null;
+  let segmentIndex = 0;
 
-  for (let i = 0; i < cablePath.length - 1; i++) {
-    const p1 = map.latLngToLayerPoint(cablePath[i]);
-    const p2 = map.latLngToLayerPoint(cablePath[i + 1]);
-    
+  for (let i = 0; i < path.length - 1; i++) {
+    const p1 = map.latLngToLayerPoint(path[i]);
+    const p2 = map.latLngToLayerPoint(path[i + 1]);
     const projPt = getClosestPointOnSegment(pt, p1, p2);
     const sqDist = dist2(pt, projPt);
-    
     if (sqDist < minDistanceSq) {
       minDistanceSq = sqDist;
       closestLayerPt = projPt;
+      segmentIndex = i;
     }
   }
-  
-  if (!closestLayerPt) return null;
-  
+
   return {
+    segmentIndex,
+    latlng: map.layerPointToLatLng(closestLayerPt),
     distancePx: Math.sqrt(minDistanceSq),
-    latlng: map.layerPointToLatLng(closestLayerPt)
   };
+}
+
+/** Retorna a coordenada com Snap (imã) e a distância em pixels até o cabo */
+function snapToCable(lat, lng, cablePath) {
+  return findClosestOnPath([lat, lng], cablePath);
 }
 
 /** Recebe o clique do mapa e adiciona uma nova CTO presa ao cabo */
@@ -72,13 +79,13 @@ function placeCTO(lat, lng) {
   if (!placingRamalContext) return;
 
   const { popId, ramalId, ponIndex, cableId, fiberIndex } = placingRamalContext;
-  
+
   const cable = STATE.cables.find(c => c.id === cableId);
   if (!cable) {
      toast('⚠️ Cabo não encontrado!');
      return;
   }
-  
+
   // Imã no cabo (tolerância de ~30 pixels)
   const snap = snapToCable(lat, lng, cable.path);
   if (!snap || snap.distancePx > 30) {
@@ -122,7 +129,7 @@ function placeCTO(lat, lng) {
   saveLocal();
   renderAllCTOMarkers();
   if (STATE.selectedId === popId) renderPanel();
-  
+
   toast(`✅ ${ctoName} fixada no cabo!`);
 }
 
@@ -137,11 +144,11 @@ function renderAllCTOMarkers() {
       (pon.ramais || []).forEach(ramal => {
         (ramal.ctos || []).forEach((cto, ctoIdx) => {
           if (cto.lat && cto.lng) {
-            
+
             let bgColor = pon.color || '#3b82f6';
             let textColor = '#fff';
             let tooltipExtra = '';
-            
+
             if (cto.fiberIndex) {
                const fColor = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(cto.fiberIndex - 1) % FIBER_COLORS.length] : null;
                if (fColor) {
@@ -170,7 +177,7 @@ function renderAllCTOMarkers() {
             // Atualiza posição forçando Snap
             m.on('dragend', ev => {
               let { lat, lng } = ev.target.getLatLng();
-              
+
               if (cto.cableId) {
                  const cable = STATE.cables.find(c => c.id === cto.cableId);
                  if (cable) {
@@ -179,17 +186,17 @@ function renderAllCTOMarkers() {
                     if (snap) {
                         lat = snap.latlng.lat;
                         lng = snap.latlng.lng;
-                        m.setLatLng([lat, lng]); 
+                        m.setLatLng([lat, lng]);
                         toast('🧲 CTO fixada de volta no cabo!');
                     }
                  }
               }
-              
+
               cto.lat = lat;
               cto.lng = lng;
               saveLocal();
             });
-            
+
             m.on('click', ev => {
                 L.DomEvent.stopPropagation(ev);
                 if (STATE.tool === 'eraser') {
