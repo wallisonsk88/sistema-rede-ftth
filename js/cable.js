@@ -339,6 +339,7 @@ function toggleGeomanEditCable(id) {
      cable.layer.pm.disable();
      isGeomanEditingCableId = null;
      document.body.classList.remove('editing-cable');
+     map.doubleClickZoom.enable();
      saveLocal();
      toast('💾 Ajuste fino do cabo salvo com sucesso!');
   } else {
@@ -353,6 +354,7 @@ function toggleGeomanEditCable(id) {
      // Ativa edição neste cabo
      isGeomanEditingCableId = id;
      document.body.classList.add('editing-cable');
+     map.doubleClickZoom.disable(); // duplo clique passa a finalizar a edição
      
      // Remove pontos duplicados para evitar bugs de nós sobrepostos (causados por duplo clique)
      if (cable.path && cable.path.length > 0) {
@@ -375,7 +377,7 @@ function toggleGeomanEditCable(id) {
        allowSelfIntersection: true,
        preventMarkerRemoval: false
      });
-     toast('✏️ Edição livre: Clique com botão direito na bolinha para apagar. Arraste para mover.');
+     toast('✏️ Edição livre: Arraste a bolinha para mover, botão direito nela para apagar. Duplo clique para finalizar.');
   }
   renderPanel();
 }
@@ -389,6 +391,7 @@ function removeCable(id) {
   if (isGeomanEditingCableId === id) {
     isGeomanEditingCableId = null;
     document.body.classList.remove('editing-cable');
+    map.doubleClickZoom.enable();
   }
 
   if (cable.layer) map.removeLayer(cable.layer);

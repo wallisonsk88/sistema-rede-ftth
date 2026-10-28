@@ -29,6 +29,9 @@ map.on('dblclick', e => {
   }
   if (STATE.tool === 'cable') {
     if (typeof finishCable === 'function') finishCable();
+  } else if (isGeomanEditingCableId) {
+    // Duplo clique no mapa finaliza a edição do cabo
+    toggleGeomanEditCable(isGeomanEditingCableId);
   }
 });
 
