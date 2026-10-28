@@ -167,9 +167,7 @@ function removePonRota(popId, ponIndex) {
 
   pop.pons = pop.pons.filter(p => p.index !== ponIndex);
 
-  if (typeof syncPopCables === 'function') syncPopCables(popId);
-
-  saveLocal();
+  saveLocal(); // as fibras dos ramais desta rota ficam livres
   renderPanel();
   toast('🗑️ Rota da PON ' + String(ponIndex).padStart(2, '0') + ' removida');
 }
@@ -257,7 +255,7 @@ function addRamal(popId, ponIndex) {
     ctos: []
   });
 
-  if (typeof syncPopCables === 'function') syncPopCables(popId);
+  autoConnectRamais(popId, [ramalId]);
 
   saveLocal();
   renderPanel();
@@ -273,9 +271,7 @@ function removeRamal(popId, ponIndex, ramalId) {
 
   pon.ramais = pon.ramais.filter(r => r.id !== ramalId);
 
-  if (typeof syncPopCables === 'function') syncPopCables(popId);
-
-  saveLocal();
+  saveLocal(); // a fibra do ramal fica livre
   renderPanel();
 }
 
@@ -300,17 +296,6 @@ function updateRamal(popId, ponIndex, ramalId, key, val) {
        });
     }
     saveLocal();
-    if (key === 'cableId') {
-       // Se mudar o cabo alvo, tira do mapeamento atual para forçar o syncPopCables a realocar
-       STATE.cables.forEach(c => {
-           if (c.fiberMapping) {
-               for (let f in c.fiberMapping) {
-                   if (c.fiberMapping[f] === ramalId) delete c.fiberMapping[f];
-               }
-           }
-       });
-       if (typeof syncPopCables === 'function') syncPopCables(popId);
-    }
     renderPanel();
   }
 }

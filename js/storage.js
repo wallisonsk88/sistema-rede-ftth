@@ -141,11 +141,6 @@ function applyDataToState(data) {
     if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
   });
 
-  // Força o auto-mapeamento para projetos já salvos antes da atualização
-  STATE.olts.forEach(o => {
-    if (typeof syncPopCables === 'function') syncPopCables(o.id);
-  });
-
   // Centraliza o mapa no projeto carregado automaticamente
   setTimeout(() => {
     if (typeof fitBounds === 'function') fitBounds();

@@ -247,17 +247,24 @@ function renderPOPProps(pop) {
                 <button class="pon-remove-btn" style="font-size:10px; color:var(--primary); font-weight:600;" onclick="addRamal('${pop.id}', ${i})">+ Adicionar Ramal</button>
               </div>
               ${(pon.ramais || []).map((ramal, rIdx) => {
-                let mappedFiberNum = '';
+                // Fibra do cabo tronco em que este ramal sai da OLT (é dela que a informação corre pela rede)
                 const popCables = getPopRootCables(pop.id);
+                let mappedFiberNum = '';
+                let mappedValue = '';
                 for (const pc of popCables) {
-                  for (const fNum in pc.fiberMapping) {
-                    if (pc.fiberMapping[fNum] === ramal.id) {
-                      mappedFiberNum = fNum;
-                      break;
-                    }
-                  }
-                  if (mappedFiberNum) break;
+                  const f = Object.keys(pc.fiberMapping || {}).find(k => pc.fiberMapping[k] === ramal.id);
+                  if (f) { mappedFiberNum = f; mappedValue = pc.id + ':' + f; break; }
                 }
+                const fiberOptions = popCables.filter(c => !c.oltId || c.oltId === ponToOltMap[pon.index]).map(c => {
+                  let opts = '';
+                  for (let f = 1; f <= c.fibers; f++) {
+                    const value = c.id + ':' + f;
+                    const other = c.fiberMapping && c.fiberMapping[f];
+                    const busy = other && other !== ramal.id ? getRamalInfo(other) : null;
+                    opts += `<option value="${value}" ${value === mappedValue ? 'selected' : ''} ${busy ? 'disabled' : ''}>${fiberLabel(f, c.fibers)}${busy ? ' — ' + busy.pon.rotaName + ' · ' + busy.ramal.name : ''}</option>`;
+                  }
+                  return `<optgroup label="${c.name || 'Cabo Tronco ' + c.fibers + ' FO'}">${opts}</optgroup>`;
+                }).join('');
 
                 let ramalHtml = `<div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
                   <div style="display:flex; gap:8px; margin-bottom:8px;">
@@ -276,28 +283,19 @@ function renderPOPProps(pop) {
                       <button onclick="removeRamal('${pop.id}', ${i}, '${ramal.id}')" style="background:var(--red); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px;" title="Remover Ramal">🗑️</button>
                     </div>
                   </div>
-                  <div style="display:flex; gap:8px; margin-bottom:8px;">
-                    <div style="flex:1;">
-                      <label style="font-size:9px; color:var(--primary); display:block; margin-bottom:2px; font-weight:bold;">Tubar no Cabo Tronco (Opcional):</label>
-                      <select onchange="updateRamal('${pop.id}', ${i}, '${ramal.id}', 'cableId', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none;">
-                        <option value="">-- Automático (Qualquer Vinculado) --</option>
-                        ${(() => {
-                           const oltId = ponToOltMap[pon.index];
-                           const eligibleCables = popCables.filter(c => !c.oltId || c.oltId === oltId);
-                           return eligibleCables.map(c => `<option value="${c.id}" ${ramal.cableId === c.id ? 'selected' : ''}>${c.name || 'Cabo Tronco ' + c.fibers + ' FO'}</option>`).join('');
-                        })()}
-                      </select>
-                    </div>
-                  </div>
                   <div style="display:flex; gap:8px;">
                     <div style="flex:1;">
-                      <label style="font-size:9px; color:var(--text3); display:block; margin-bottom:2px;">Alocação FO Tronco (Somente Leitura)</label>
-                      <input type="text" value="${mappedFiberNum ? 'Fibra ' + mappedFiberNum : 'Livre'}" disabled style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none; opacity:0.7;" title="Alocação de fibra agora é feita na aba de Propriedades do Cabo!">
+                      <label style="font-size:9px; color:var(--primary); display:block; margin-bottom:2px; font-weight:bold;">🔗 Sai da OLT na fibra do cabo tronco</label>
+                      <select onchange="connectRamalToFiber('${ramal.id}', this.value)" style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid ${mappedFiberNum ? 'var(--border)' : 'var(--yellow)'}; color:var(--text); border-radius:4px; outline:none;">
+                        <option value="">-- Não conectado --</option>
+                        ${fiberOptions}
+                      </select>
+                      ${popCables.length === 0 ? '<div style="font-size:9px; color:var(--text3); margin-top:2px;">Lance um cabo saindo deste POP para conectar o ramal.</div>' : ''}
                     </div>
-                    <div>
+                    <div style="display:flex; align-items:flex-end;">
                       ${mappedFiberNum ?
                         `<button onclick="highlightRamal('${pop.id}', '${ramal.id}')" title="Destacar Rota no Mapa" style="background:none; border:none; cursor:pointer; font-size:16px; color:var(--primary); transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">🔍</button>`
-                        : `<button disabled title="O ramal precisa estar tubado em um cabo para ser destacado no mapa" style="background:none; border:none; font-size:16px; color:var(--text3); opacity:0.5; cursor:not-allowed;">🔍</button>`}
+                        : `<button disabled title="Conecte o ramal numa fibra do cabo tronco para destacar no mapa" style="background:none; border:none; font-size:16px; color:var(--text3); opacity:0.5; cursor:not-allowed;">🔍</button>`}
                     </div>
                   </div>
                 `;
@@ -556,8 +554,6 @@ function renderCableProps(cable) {
   // Mapeia onde cada ramal está sendo usado em OUTROS cabos tronco
   // (nos derivados ele chega por fusão, isso não é conflito)
   let ramalUsageMap = {};
-
-  // 1. Pela alocação de fibra
   STATE.cables.forEach(c => {
      if (c.id === cable.id || !isRootCable(c)) return;
      if (c.fiberMapping) {
@@ -565,18 +561,6 @@ function renderCableProps(cable) {
            ramalUsageMap[c.fiberMapping[f]] = c.name || 'Outro Cabo';
         }
      }
-  });
-
-  // 2. Pela amarração forçada no POP
-  STATE.olts.forEach(pop => {
-     (pop.pons || []).forEach(pon => {
-        (pon.ramais || []).forEach(ramal => {
-           if (ramal.cableId && ramal.cableId !== cable.id) {
-               const cInfo = STATE.cables.find(c => c.id === ramal.cableId);
-               ramalUsageMap[ramal.id] = cInfo ? (cInfo.name || 'Outro Cabo') : 'Outro Cabo';
-           }
-        });
-     });
   });
 
   const cuts = getFiberCuts(cable);
@@ -762,65 +746,19 @@ function renderSpliceProps(splice) {
        }
     });
 
-    // Check which trunk fibers are cut in upstream splices OR used in downstream splices
+    // Fibras do cabo de entrada cortadas numa CEO anterior ou usadas numa CEO mais à frente
+    // (mesma regra da propagação do sinal: a CTO não corta a fibra)
     const cutUpstreamFibers = {};
     const usedDownstreamFibers = {};
-    if (sourceCable && typeof getDistanceAlongCable === 'function') {
-      let isReversed = false;
-      let srcCoord = null;
-      if (sourceCable.sourceType === 'pop') {
-         const pop = STATE.olts.find(o => o.id === sourceCable.sourceId);
-         if (pop) srcCoord = [pop.lat, pop.lng];
-      } else if (sourceCable.sourceType === 'splice') {
-         const sp = STATE.splices.find(s => s.id === sourceCable.sourceId);
-         if (sp) srcCoord = [sp.lat, sp.lng];
-      }
-
-      if (srcCoord && sourceCable.path && sourceCable.path.length > 1) {
-         const distStart = typeof map !== 'undefined' ? map.distance(srcCoord, sourceCable.path[0]) : 0;
-         const distEnd = typeof map !== 'undefined' ? map.distance(srcCoord, sourceCable.path[sourceCable.path.length - 1]) : Infinity;
-         if (distEnd < distStart) isReversed = true;
-      }
-
-      const thisSpliceDist = getDistanceAlongCable([splice.lat, splice.lng], sourceCable.path);
-
-      STATE.splices.forEach(s => {
-        if (s.cableId === splice.cableId && s.id !== splice.id && s.fusions) {
-          const sDist = getDistanceAlongCable([s.lat, s.lng], sourceCable.path);
-          let isUpstream = isReversed ? (sDist > thisSpliceDist) : (sDist < thisSpliceDist);
-
-          if (isUpstream) {
-            Object.values(s.fusions).forEach(cableFusions => {
-               Object.values(cableFusions).forEach(f => cutUpstreamFibers[f] = true);
-            });
-            if (s.splitter && s.splitter.inputFiber) cutUpstreamFibers[s.splitter.inputFiber] = true;
-          } else {
-            Object.values(s.fusions).forEach(cableFusions => {
-               Object.values(cableFusions).forEach(f => usedDownstreamFibers[f] = true);
-            });
-            if (s.splitter && s.splitter.inputFiber) usedDownstreamFibers[s.splitter.inputFiber] = true;
-          }
-        }
-      });
-
-      // Checa também as CTOs (Caixas) no mesmo cabo
-      STATE.olts.forEach(pop => {
-         (pop.pons || []).forEach(pon => {
-            (pon.ramais || []).forEach(ramal => {
-               (ramal.ctos || []).forEach(cto => {
-                   if (cto.cableId === splice.cableId && cto.fiberIndex && cto.lat && cto.lng) {
-                       const ctoDist = getDistanceAlongCable([cto.lat, cto.lng], sourceCable.path);
-                       let isUpstream = isReversed ? (ctoDist > thisSpliceDist) : (ctoDist < thisSpliceDist);
-
-                       if (isUpstream) {
-                          cutUpstreamFibers[cto.fiberIndex] = true;
-                       } else {
-                          usedDownstreamFibers[cto.fiberIndex] = true;
-                       }
-                   }
-               });
-            });
-         });
+    if (sourceCable) {
+      const alongUses = getSpliceUsesAlong(sourceCable);
+      const here = alongUses.find(u => u.splice.id === splice.id);
+      alongUses.forEach(u => {
+        if (u.splice.id === splice.id) return;
+        u.fibers.forEach(f => {
+          if (u.dist < here.dist) cutUpstreamFibers[f] = true;
+          else usedDownstreamFibers[f] = true;
+        });
       });
     }
 
@@ -1115,31 +1053,11 @@ window.updateSpliceField = function(spliceId, field, value) {
 }
 
 function renderCTOProps(cto, pop, pon, ramal) {
-  // Descobre a fibra física em que esta CTO está no cabo
-  let fiberStr = "Sinal Ausente";
-  let fiberHex = "#475569";
-
-  if (cto.cableId) {
-     const cable = STATE.cables.find(c => c.id === cto.cableId);
-     if (cable && cable.fiberMapping) {
-        if (cto.fiberIndex) {
-            const fNum = cto.fiberIndex;
-            const fiberObj = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(parseInt(fNum) - 1) % FIBER_COLORS.length] : null;
-            fiberStr = `Fibra ${fNum} (${fiberObj ? fiberObj.name : 'Desconhecida'})`;
-            fiberHex = fiberObj ? fiberObj.hex : '#ccc';
-        } else {
-            // Legado: pega a primeira fibra que pertence ao ramal
-            for (let fNum in cable.fiberMapping) {
-               if (cable.fiberMapping[fNum] === ramal.id) {
-                  const fiberObj = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(parseInt(fNum) - 1) % FIBER_COLORS.length] : null;
-                  fiberStr = `Fibra ${fNum} (${fiberObj ? fiberObj.name : 'Desconhecida'})`;
-                  fiberHex = fiberObj ? fiberObj.hex : '#ccc';
-                  break;
-               }
-            }
-        }
-     }
-  }
+  // A informação da CTO é o sinal que chega pela fibra em que ela está presa
+  const signal = getCtoSignal(cto);
+  const info = getRamalInfo(signal.ramalId);
+  const fiberObj = signal.fiber ? FIBER_COLORS[(signal.fiber - 1) % FIBER_COLORS.length] : null;
+  const fiberStr = signal.cable && signal.fiber ? `${signal.cable.name} · ${fiberLabel(signal.fiber, signal.cable.fibers)}` : 'Não está presa em um cabo';
 
   let html = `
   <div class="panel-section">
@@ -1149,13 +1067,15 @@ function renderCTOProps(cto, pop, pon, ramal) {
     </div>
 
     <div style="font-size:11px; color:var(--text2); margin-bottom:15px;">
-      Hierarquia: <b>${pop.name}</b> ➡️ ${(getRamalInfo(ramal.id) || {}).oltName} ➡️ PON ${(getRamalInfo(ramal.id) || {}).ponLabel} ➡️ ${pon.rotaName} ➡️ ${ramal.name}
+      ${info
+        ? `Hierarquia: <b>${info.pop.name}</b> ➡️ ${info.oltName} ➡️ PON ${info.ponLabel} ➡️ ${info.pon.rotaName} ➡️ ${info.ramal.name}`
+        : `<span style="color:var(--red);">⚠️ Sem sinal: a fibra desta CTO não tem rota da OLT ou foi cortada numa CEO antes dela.</span>`}
     </div>
 
     <div class="fp-group" style="margin-bottom: 20px; background:var(--bg3); padding:10px; border-radius:6px;">
       <label class="fp-label">Fibra Física no Cabo</label>
       <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-          <div style="width:20px; height:20px; border-radius:50%; background:${fiberHex}; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>
+          <div style="width:20px; height:20px; border-radius:50%; background:${fiberObj ? fiberObj.hex : '#475569'}; border:2px solid #fff; box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>
           <span style="font-size:14px; font-weight:bold; color:var(--text1)">${fiberStr}</span>
       </div>
     </div>
@@ -1215,9 +1135,6 @@ window.toggleCableOltLink = function(cableId, oltId, isLinked) {
        }
    }
 
-   if (typeof window.saveLocal === 'function') window.saveLocal();
-
-   const popId = cable ? (cable.sourceId || cable.popId) : null;
-   if (popId && typeof window.syncPopCables === 'function') window.syncPopCables(popId);
-   if (typeof window.renderPanel === 'function') window.renderPanel();
+   saveLocal();
+   renderPanel();
 };

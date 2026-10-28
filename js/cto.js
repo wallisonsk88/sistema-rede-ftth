@@ -145,20 +145,13 @@ function renderAllCTOMarkers() {
         (ramal.ctos || []).forEach((cto, ctoIdx) => {
           if (cto.lat && cto.lng) {
 
-            let bgColor = pon.color || '#3b82f6';
-            let textColor = '#fff';
-            let tooltipExtra = '';
-
-            if (cto.fiberIndex) {
-               const fColor = typeof FIBER_COLORS !== 'undefined' ? FIBER_COLORS[(cto.fiberIndex - 1) % FIBER_COLORS.length] : null;
-               if (fColor) {
-                  bgColor = fColor.hex;
-                  tooltipExtra = `<br>Fibra Local: ${cto.fiberIndex} (${fColor.name})`;
-               }
-            }
+            // Cor da fibra em que a CTO está; cinza tracejado quando o sinal não chega nela
+            const hasSignal = !!getCtoSignal(cto).ramalId;
+            const fColor = cto.fiberIndex ? FIBER_COLORS[(cto.fiberIndex - 1) % FIBER_COLORS.length] : null;
+            const bgColor = !hasSignal ? '#64748b' : (fColor ? fColor.hex : (pon.color || '#3b82f6'));
 
             const icon = L.divIcon({
-              html: `<div class="marker-cto" style="background:${bgColor}; color:#000; border:2px solid #fff; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
+              html: `<div class="marker-cto" style="background:${bgColor}; color:#000; border:2px ${hasSignal ? 'solid #fff' : 'dashed #ef4444'}; border-radius:4px; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
                        ${ctoIdx + 1}
                      </div>`,
               className: 'marker-cto',
@@ -172,7 +165,14 @@ function renderAllCTOMarkers() {
               zIndexOffset: 500,
             });
 
-            m.bindTooltip(`<b>${pop.name}</b><br>${pon.rotaName} - ${ramal.name}<br>${cto.name}<br>Splitter: ${cto.ratio}${tooltipExtra}`, { direction: 'top', offset: [0, -10] });
+            // Tooltip lido na hora: renomear OLT/rota/ramal ou mudar fusões reflete aqui
+            m.bindTooltip(() => {
+              const s = getCtoSignal(cto);
+              const info = getRamalInfo(s.ramalId);
+              return `<b>${cto.name}</b><br>${info ? `${info.pop.name} · ${info.label}` : '⚠️ Sem sinal'}`
+                + (s.cable && s.fiber ? `<br>${s.cable.name} · ${fiberLabel(s.fiber, s.cable.fibers)}` : '')
+                + `<br>Splitter: ${cto.ratio}`;
+            }, { direction: 'top', offset: [0, -10] });
 
             // Atualiza posição forçando Snap
             m.on('dragend', ev => {
@@ -200,11 +200,8 @@ function renderAllCTOMarkers() {
             m.on('click', ev => {
                 L.DomEvent.stopPropagation(ev);
                 if (STATE.tool === 'eraser') {
-                    ramal.ctos.splice(ctoIdx, 1);
-                    ramal.ctos.forEach((c, i) => {
-                        c.name = `CTO ${String(i + 1).padStart(2, '0')}`;
-                    });
-                    saveLocal();
+                    ramal.ctos.splice(ramal.ctos.indexOf(cto), 1);
+                    saveLocal(); // renumera as CTOs com nome padrão
                     renderAllCTOMarkers();
                     renderPanel();
                     toast('CTO removida!');

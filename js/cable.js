@@ -155,15 +155,17 @@ function finishCable() {
   // Renderiza no mapa
   renderCableOnMap(obj);
 
-  if (currentCableSourceType === 'pop') {
-     if (typeof syncPopCables === 'function') syncPopCables(currentCableSourceId);
-  } else {
-     saveLocal();
+  // Cabo tronco novo: ramais da OLT que ainda não saíam em nenhuma fibra são ligados nele
+  let msg = '✅ Cabo criado com sucesso!';
+  if (obj.sourceType === 'pop') {
+    const n = autoConnectRamais(obj.sourceId, null, [obj]);
+    if (n) msg += ` ${n} ramal(is) sem fibra ligado(s) nele.`;
   }
+  saveLocal();
 
   setTool('select');
   selectElement(id);
-  toast('✅ Cabo criado com sucesso!');
+  toast(msg);
 }
 
 /** Limpa o estado temporário de desenho */
@@ -352,18 +354,74 @@ function cableUpdate(id, key, val) {
   }
 }
 
-/** Aloca um ramal a uma fibra do cabo tronco (só o tronco recebe escolha manual) */
+/**
+ * Aloca um ramal a uma fibra do cabo tronco (só o tronco recebe escolha manual).
+ * Um ramal sai da OLT em uma só fibra: se ele já estava em outra, é movido.
+ */
 function setFiberMapping(cableId, fiberNumber, ramalId) {
   const cable = STATE.cables.find(c => c.id === cableId);
   if (cable) {
     if (ramalId) {
+      disconnectRamal(ramalId);
       cable.fiberMapping[fiberNumber] = ramalId;
     } else {
       delete cable.fiberMapping[fiberNumber];
     }
-    saveLocal(); // recalcula a propagação para os cabos derivados
+    saveLocal(); // recalcula a propagação para os cabos derivados e CTOs
     renderPanel();
   }
+}
+
+/** Tira o ramal de qualquer fibra de cabo tronco */
+function disconnectRamal(ramalId) {
+  STATE.cables.filter(isRootCable).forEach(c => {
+    Object.keys(c.fiberMapping || {}).forEach(f => {
+      if (c.fiberMapping[f] === ramalId) delete c.fiberMapping[f];
+    });
+  });
+}
+
+/** Liga (value = "cabo:fibra") ou desliga (value vazio) um ramal da OLT numa fibra do cabo tronco */
+function connectRamalToFiber(ramalId, value) {
+  disconnectRamal(ramalId);
+  if (value) {
+    const [cableId, fiber] = value.split(':');
+    const cable = STATE.cables.find(c => c.id === cableId);
+    if (cable) cable.fiberMapping[fiber] = ramalId;
+  }
+  saveLocal();
+  renderPanel();
+}
+
+/**
+ * Liga ramais que ainda não saem em nenhuma fibra na primeira fibra livre de um cabo tronco
+ * (só cabos da mesma OLT do ramal ou sem OLT definida). Usado ao criar um ramal ou um
+ * cabo tronco novo; a ligação aparece no painel e pode ser trocada. Retorna quantos ligou.
+ */
+function autoConnectRamais(popId, ramalIds, cables) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (!pop) return 0;
+  cables = cables || getPopRootCables(popId);
+  const ponToOlt = buildPonToOltMap(pop);
+  const connected = new Set();
+  STATE.cables.filter(isRootCable).forEach(c => Object.values(c.fiberMapping || {}).forEach(r => connected.add(r)));
+
+  let count = 0;
+  (pop.pons || []).forEach(pon => (pon.ramais || []).forEach(ramal => {
+    if (connected.has(ramal.id) || (ramalIds && !ramalIds.includes(ramal.id))) return;
+    for (const cable of cables) {
+      if (cable.oltId && cable.oltId !== ponToOlt[pon.index]) continue;
+      if (!cable.fiberMapping) cable.fiberMapping = {};
+      let f = 1;
+      while (f <= cable.fibers && cable.fiberMapping[f]) f++;
+      if (f <= cable.fibers) {
+        cable.fiberMapping[f] = ramal.id;
+        count++;
+        break;
+      }
+    }
+  }));
+  return count;
 }
 
 /** Cabo tronco: sai direto do POP (os demais saem de uma CEO) */
@@ -377,39 +435,74 @@ function isSplitterOutput(src) {
 }
 
 /**
- * Para cada fibra do cabo, a primeira CEO (a partir da origem do cabo) onde ela é cortada:
- * fusionada para um cabo derivado (sangria) ou ligada na entrada do splitter.
+ * CEOs ao longo do cabo, com a distância (m) desde a origem e as fibras do cabo cortadas
+ * em cada uma: fusionadas para um cabo derivado (sangria) ou ligadas na entrada do splitter.
+ * A CTO não corta a fibra (no desbalanceado o sinal passa por ela).
+ */
+function getSpliceUsesAlong(cable) {
+  return STATE.splices.filter(s => s.cableId === cable.id).map(sp => {
+    const fibers = new Set();
+    Object.values(sp.fusions || {}).forEach(fus => Object.values(fus).forEach(src => {
+      if (!isSplitterOutput(src)) fibers.add(parseInt(src));
+    }));
+    if (sp.splitter && sp.splitter.inputFiber) fibers.add(parseInt(sp.splitter.inputFiber));
+    return { splice: sp, dist: getDistanceAlongCable([sp.lat, sp.lng], cable.path), fibers };
+  });
+}
+
+/**
+ * Para cada fibra do cabo, a primeira CEO (a partir da origem do cabo) onde ela é cortada.
  * Retorna { [fibra]: { splice, dist } }.
  */
 function getFiberCuts(cable) {
   const cuts = {};
-  STATE.splices.filter(s => s.cableId === cable.id).forEach(sp => {
-    const dist = getDistanceAlongCable([sp.lat, sp.lng], cable.path);
-    const used = new Set();
-    Object.values(sp.fusions || {}).forEach(fus => Object.values(fus).forEach(src => {
-      if (!isSplitterOutput(src)) used.add(parseInt(src));
-    }));
-    if (sp.splitter && sp.splitter.inputFiber) used.add(parseInt(sp.splitter.inputFiber));
-    used.forEach(fiber => {
-      if (!cuts[fiber] || dist < cuts[fiber].dist) cuts[fiber] = { splice: sp, dist };
+  getSpliceUsesAlong(cable).forEach(({ splice, dist, fibers }) => {
+    fibers.forEach(fiber => {
+      if (!cuts[fiber] || dist < cuts[fiber].dist) cuts[fiber] = { splice, dist };
     });
   });
   return cuts;
+}
+
+/** Ramal que chega num ponto de uma fibra do cabo (null se a fibra foi cortada antes do ponto) */
+function getFiberSignalAt(cable, fiber, latlng) {
+  const cut = getFiberCuts(cable)[fiber];
+  if (cut && getDistanceAlongCable(latlng, cable.path) > cut.dist + 1) return null;
+  return cable.fiberMapping[fiber] || null;
+}
+
+/** Cabo e fibra em que a CTO está presa e o ramal que chega até ela pela rede */
+function getCtoSignal(cto) {
+  const cable = cto.cableId && cto.lat ? STATE.cables.find(c => c.id === cto.cableId) : null;
+  const fiber = cto.fiberIndex ? parseInt(cto.fiberIndex) : null;
+  if (!cable || !fiber) return { cable, fiber, ramalId: null };
+  return { cable, fiber, ramalId: getFiberSignalAt(cable, fiber, [cto.lat, cto.lng]) };
 }
 
 /**
  * Recalcula o sinal (ramal) de todas as fibras da rede a partir da OLT.
  * Só os cabos tronco guardam a escolha do usuário; nos cabos derivados o ramal
  * vem das fusões e splitters das CEOs. Uma fibra cortada numa CEO não leva
- * sinal para as CEOs que ficam depois dela no mesmo cabo.
+ * sinal para as CEOs que ficam depois dela no mesmo cabo. No fim, cada CTO
+ * passa a pertencer ao ramal que chega na fibra dela.
  */
 function recomputeSignals() {
   STATE.cables.forEach(c => {
     if (!c.fiberMapping) c.fiberMapping = {};
-    if (!isRootCable(c)) c.fiberMapping = {};
+    if (!isRootCable(c)) {
+      c.fiberMapping = {};
+      return;
+    }
+    // No tronco descarta fibras que não existem mais no cabo e ramais/rotas apagados
+    Object.keys(c.fiberMapping).forEach(f => {
+      if (parseInt(f) > c.fibers || !getRamalInfo(c.fiberMapping[f])) delete c.fiberMapping[f];
+    });
   });
 
+  // Distância (m) do início de cada cabo até a OLT, para pôr as CTOs na ordem do sinal
+  const offsets = {};
   const queue = STATE.cables.filter(isRootCable);
+  queue.forEach(c => offsets[c.id] = 0);
   const visited = new Set();
   while (queue.length) {
     const cable = queue.shift();
@@ -418,10 +511,10 @@ function recomputeSignals() {
 
     const cuts = getFiberCuts(cable);
     STATE.splices.filter(s => s.cableId === cable.id).forEach(sp => {
-      Object.entries(sp.fusions || {}).forEach(([childId, fus]) => {
-        const child = STATE.cables.find(c => c.id === childId);
-        if (!child) return;
-        Object.entries(fus).forEach(([childFiber, src]) => {
+      const spliceDist = offsets[cable.id] + getDistanceAlongCable([sp.lat, sp.lng], cable.path);
+      STATE.cables.filter(c => c.sourceType === 'splice' && c.sourceId === sp.id).forEach(child => {
+        if (offsets[child.id] === undefined) offsets[child.id] = spliceDist;
+        Object.entries((sp.fusions || {})[child.id] || {}).forEach(([childFiber, src]) => {
           const parentFiber = isSplitterOutput(src) ? parseInt(sp.splitter && sp.splitter.inputFiber) : parseInt(src);
           if (!parentFiber) return;
           // Se a fibra já foi cortada numa CEO anterior, o sinal não chega nesta
@@ -434,80 +527,66 @@ function recomputeSignals() {
       });
     });
   }
+
+  syncCTOsWithSignal(offsets);
 }
 
-/** Auto-mapeia as fibras dos cabos tronco que saem do POP, respeitando a escolha manual do cabo */
-window.syncPopCables = function(popId) {
-  const pop = STATE.olts.find(o => o.id === popId);
-  if (!pop) return;
+let lastCtoSignature = null;
 
-  const rootCables = getPopRootCables(popId);
+/**
+ * Cada CTO pertence ao ramal que chega pela fibra em que ela está presa: se a fibra
+ * passar a levar outro ramal (troca no tronco ou fusão na CEO), a CTO acompanha.
+ * As CTOs de cada ramal ficam em ordem de distância da OLT (CTO 01 é a mais perto).
+ */
+function syncCTOsWithSignal(offsets) {
+  const ramais = {};
+  STATE.olts.forEach(pop => (pop.pons || []).forEach(pon => (pon.ramais || []).forEach(r => {
+    if (!r.ctos) r.ctos = [];
+    ramais[r.id] = r;
+  })));
 
-  // NUNCA limpa mapeamento! Isso deletava as escolhas manuais que o usuário fez no painel do cabo!
-  // Em vez disso, vamos apenas verificar quais ramais já estão mapeados e quais fibras estão livres.
-
-  let mappedRamais = new Set();
-  let cableNextFiber = {};
-
-  rootCables.forEach(cable => {
-    if (!cable.fiberMapping) cable.fiberMapping = {};
-    for (let i = 1; i <= cable.fibers; i++) {
-        if (cable.fiberMapping[i]) {
-            mappedRamais.add(cable.fiberMapping[i]);
-        }
+  const distFromOlt = {};
+  const signals = {};
+  const moves = [];
+  Object.values(ramais).forEach(ramal => ramal.ctos.forEach(cto => {
+    const cable = cto.lat && cto.cableId ? STATE.cables.find(c => c.id === cto.cableId) : null;
+    if (!cable) return;
+    if (!cto.fiberIndex) {
+      // Legado: CTO sem fibra gravada fica na fibra do cabo que leva o ramal dela
+      const f = Object.keys(cable.fiberMapping).find(k => cable.fiberMapping[k] === ramal.id);
+      if (f) cto.fiberIndex = parseInt(f);
     }
-    // Encontra a primeira fibra livre para iniciar
-    let firstFree = 1;
-    while(cable.fiberMapping[firstFree] && firstFree <= cable.fibers) {
-        firstFree++;
+    if (offsets[cable.id] !== undefined) {
+      distFromOlt[cto.id] = offsets[cable.id] + getDistanceAlongCable([cto.lat, cto.lng], cable.path);
     }
-    cableNextFiber[cable.id] = firstFree;
+    const signal = getCtoSignal(cto).ramalId;
+    signals[cto.id] = signal;
+    if (signal && signal !== ramal.id && ramais[signal]) moves.push({ cto, from: ramal, to: ramais[signal] });
+  }));
+
+  moves.forEach(({ cto, from, to }) => {
+    from.ctos.splice(from.ctos.indexOf(cto), 1);
+    to.ctos.push(cto);
+    cto.type = to.type;
+    if (to.type === 'desbalanceado' && !SPLITTER_UNBAL[cto.ratio]) cto.ratio = '10/90';
+    if (to.type !== 'desbalanceado' && !SPLITTER_BAL[cto.ratio]) cto.ratio = '1:4';
   });
 
-  // Mapa de OLT do PON para sabermos a quem o ramal pertence
-  const ponToOltMap = buildPonToOltMap(pop);
-
-  // Pega ramais não mapeados ainda (que o usuário acabou de criar)
-  let unassignedRamais = [];
-  (pop.pons || []).forEach(pon => {
-    let oltId = ponToOltMap[pon.index];
-    (pon.ramais || []).forEach(ramal => {
-       if (!mappedRamais.has(ramal.id)) {
-           unassignedRamais.push({ id: ramal.id, oltId: oltId, cableId: ramal.cableId });
-       }
+  // Lançadas na ordem do sinal, depois as lançadas fora da rede, depois as ainda não lançadas
+  const rank = cto => distFromOlt[cto.id] !== undefined ? distFromOlt[cto.id] : (cto.lat ? 1e12 : 2e12);
+  Object.values(ramais).forEach(ramal => {
+    ramal.ctos.sort((a, b) => rank(a) - rank(b));
+    ramal.ctos.forEach((cto, i) => {
+      if (/^CTO \d+$/.test(cto.name)) cto.name = 'CTO ' + String(i + 1).padStart(2, '0');
     });
   });
 
-  // Aloca novos ramais sequencialmente, mas respeitando o limite da OLT do cabo
-  for (let rObj of unassignedRamais) {
-     let placed = false;
-
-     // Filtra cabos elegíveis para este ramal (ou cabo forçado via ramal.cableId, ou cabos que casam com a OLT)
-     let eligibleCables = rootCables;
-     if (rObj.cableId) {
-         eligibleCables = rootCables.filter(c => c.id === rObj.cableId);
-     } else if (rObj.oltId) {
-         // Cabos que estao vazios de OLT ou vinculados a esta mesma OLT
-         eligibleCables = rootCables.filter(c => !c.oltId || c.oltId === rObj.oltId);
-     }
-
-     for (let cable of eligibleCables) {
-         let fiberIndex = cableNextFiber[cable.id];
-         // Avança até achar uma fibra realmente vazia (pois o usuário pode ter mapeado pulando fibras)
-         while(cable.fiberMapping[fiberIndex] && fiberIndex <= cable.fibers) {
-             fiberIndex++;
-         }
-
-         if (fiberIndex <= cable.fibers) {
-             cable.fiberMapping[fiberIndex] = rObj.id;
-             cableNextFiber[cable.id] = fiberIndex + 1;
-             placed = true;
-             break;
-         }
-     }
+  // Redesenha os marcadores só quando algo visível mudou (ramal, ordem, nome ou sinal)
+  const signature = JSON.stringify(Object.values(ramais).map(r => [r.id, r.ctos.map(c => [c.id, c.name, signals[c.id] || null])]));
+  if (signature !== lastCtoSignature) {
+    lastCtoSignature = signature;
+    if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
   }
-
-  saveLocal(); // propaga para os cabos derivados (recomputeSignals)
 }
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
