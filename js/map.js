@@ -25,10 +25,11 @@ L.Control.geocoder({
 
 // Camadas de mapa
 const tiles = {
-  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', 
-    maxZoom: 24, 
-    maxNativeZoom: 18
+  // OpenStreetMap com filtro escuro (o CARTO dark passou a exigir chave de API)
+  dark: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 24,
+    maxNativeZoom: 19,
+    className: 'tiles-dark',
   }),
   satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     maxZoom: 24,

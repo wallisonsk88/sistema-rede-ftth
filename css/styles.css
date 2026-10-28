@@ -205,6 +205,9 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+/* Deixa o mapa claro do OpenStreetMap com aparência escura */
+.tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.6); }
+
 body.drawing #map,
 body.drawing .leaflet-container { cursor: crosshair !important; }
 
