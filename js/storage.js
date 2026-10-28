@@ -1,31 +1,66 @@
 /**
- * storage.js — Persistência local, importação e exportação
+ * storage.js — Persistência na nuvem (Firebase Firestore), importação e exportação
  */
 
 const urlParams = new URLSearchParams(window.location.search);
 const currentProjectId = urlParams.get('id');
-const STORAGE_KEY = currentProjectId ? `meganet_ftth_project_${currentProjectId}` : 'meganet_ftth_v2';
-const PROJECTS_LIST_KEY = 'meganet_projects_list';
-let saveTimeout = null;
+const CLOUD_SAVE_DELAY = 1500; // ms — agrupa várias alterações em uma única gravação
+let currentUser = null;
+let projectLoaded = false;     // só grava na nuvem depois que o projeto foi carregado
+let cloudSaveTimeout = null;
+let cloudSaveInFlight = false;
+let pendingStateJson = null;
 window.STATE_HISTORY = [];
 window.isUndoing = false;
 
-/** Atualiza o nome e data do projeto na lista do dashboard */
-function syncProjectMeta(projectName) {
-  if (!currentProjectId) return;
-  try {
-    const projects = JSON.parse(localStorage.getItem(PROJECTS_LIST_KEY)) || [];
-    const idx = projects.findIndex(p => p.id === currentProjectId);
-    if (idx !== -1) {
-      projects[idx].name = projectName;
-      projects[idx].updatedAt = new Date().toISOString();
-    } else {
-      // Projeto não está na lista ainda — adiciona
-      projects.push({ id: currentProjectId, name: projectName, updatedAt: new Date().toISOString() });
-    }
-    localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(projects));
-  } catch(e) {}
+/** Atualiza o indicador de sincronização na barra de status */
+function setSyncStatus(status) {
+  const el = document.getElementById('sb-sync');
+  if (!el) return;
+  const labels = {
+    saved:   '☁️ Salvo na nuvem',
+    pending: '⏳ Salvando...',
+    error:   '⚠️ Erro ao salvar',
+  };
+  el.textContent = labels[status] || '';
 }
+
+/** Grava o estado atual no Firestore (dados + nome/data na lista do dashboard) */
+async function flushCloudSave() {
+  cloudSaveTimeout = null;
+  if (!pendingStateJson || !currentUser || !currentProjectId) return;
+
+  const json = pendingStateJson;
+  pendingStateJson = null;
+  const updatedAt = new Date().toISOString();
+  const name = document.getElementById('projectName').value;
+
+  cloudSaveInFlight = true;
+  try {
+    const batch = fbDB.batch();
+    batch.set(userProjectDataRef(currentUser.uid).doc(currentProjectId), { json, updatedAt });
+    batch.set(userProjectsRef(currentUser.uid).doc(currentProjectId), { name, updatedAt });
+    await batch.commit();
+    if (!pendingStateJson) setSyncStatus('saved');
+  } catch (e) {
+    console.error('Erro ao salvar na nuvem:', e);
+    setSyncStatus('error');
+    toast('⚠️ Erro ao salvar na nuvem: ' + e.message);
+    // Mantém para tentar de novo na próxima alteração
+    if (!pendingStateJson) pendingStateJson = json;
+  } finally {
+    cloudSaveInFlight = false;
+  }
+}
+
+// Avisa antes de fechar a página se ainda houver alterações não enviadas
+window.addEventListener('beforeunload', e => {
+  if (cloudSaveTimeout || cloudSaveInFlight || pendingStateJson) {
+    if (cloudSaveTimeout) { clearTimeout(cloudSaveTimeout); flushCloudSave(); }
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 function saveLocal() {
   const data = {
@@ -88,14 +123,11 @@ function saveLocal() {
     }
   }
 
-  try {
-    localStorage.setItem(STORAGE_KEY, currentStateJson);
-    // Atualiza nome e data na lista do dashboard
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => syncProjectMeta(data.projectName), 1000);
-  } catch (e) {
-    console.error('Erro ao salvar localmente:', e);
-  }
+  if (!projectLoaded) return;
+  pendingStateJson = currentStateJson;
+  setSyncStatus('pending');
+  if (cloudSaveTimeout) clearTimeout(cloudSaveTimeout);
+  cloudSaveTimeout = setTimeout(flushCloudSave, CLOUD_SAVE_DELAY);
 }
 
 /** Aplica um objeto de dados JSON ao Estado (STATE) */
@@ -126,29 +158,33 @@ function applyDataToState(data) {
   }, 500);
 }
 
-/** Carrega o projeto do localStorage (substitui loadFromCloud) */
+/** Carrega o projeto do Firestore */
 async function loadFromCloud() {
+  currentUser = await requireAuth();
+
   if (!currentProjectId) {
-    alert('Projeto não encontrado. Redirecionando para o painel...');
     window.location.href = 'dashboard.html';
     return;
   }
 
-  console.log('💻 Carregando projeto do navegador...');
-  loadLocal();
-}
-
-/** Carrega o estado do localStorage */
-function loadLocal() {
-  const json = localStorage.getItem(STORAGE_KEY);
-  if (!json) return;
-
   try {
-    const data = JSON.parse(json);
-    applyDataToState(data);
+    const doc = await userProjectDataRef(currentUser.uid).doc(currentProjectId).get();
+    if (!doc.exists) {
+      alert('Projeto não encontrado. Redirecionando para o painel...');
+      window.location.href = 'dashboard.html';
+      return;
+    }
+    applyDataToState(JSON.parse(doc.data().json));
+    saveLocal(); // registra o estado inicial no histórico de desfazer (ainda sem gravar na nuvem)
+    projectLoaded = true;
+    setSyncStatus('saved');
   } catch (e) {
-    console.error('Erro ao carregar do localStorage:', e);
+    console.error('Erro ao carregar projeto da nuvem:', e);
+    alert('Erro ao carregar o projeto: ' + e.message);
   }
+
+  // Renomear o projeto também salva
+  document.getElementById('projectName').addEventListener('change', () => saveLocal());
 }
 
 /** Exporta o projeto como arquivo JSON */
@@ -236,6 +272,7 @@ function importProject(event) {
       if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
       if (typeof renderAllSplices === 'function') renderAllSplices();
       setTimeout(fitBounds, 300);
+      saveLocal();
       toast('📂 Projeto importado!');
     } catch (err) {
       toast('❌ Erro ao importar: arquivo inválido');

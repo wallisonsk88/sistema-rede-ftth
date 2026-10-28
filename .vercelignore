@@ -1,0 +1,5 @@
+firebase.json
+.firebaserc
+firestore.rules
+patch.js
+*.xlsx
