@@ -25,15 +25,18 @@ L.Control.geocoder({
 
 // Camadas de mapa
 const tiles = {
-  // OpenStreetMap com filtro escuro (o CARTO dark passou a exigir chave de API)
-  dark: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // Mapa de ruas do Google com filtro escuro (mais atualizado que o OpenStreetMap)
+  dark: L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&hl=pt-BR&x={x}&y={y}&z={z}', {
+    subdomains: '0123',
     maxZoom: 24,
-    maxNativeZoom: 19,
+    maxNativeZoom: 21,
     className: 'tiles-dark',
   }),
-  satellite: L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  // Satélite com nomes de ruas (híbrido)
+  satellite: L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&hl=pt-BR&x={x}&y={y}&z={z}', {
+    subdomains: '0123',
     maxZoom: 24,
-    maxNativeZoom: 20
+    maxNativeZoom: 21
   }),
 };
 tiles.dark.addTo(map);
