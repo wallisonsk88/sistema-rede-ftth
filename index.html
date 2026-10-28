@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/styles.css?v=6">
+  <link rel="stylesheet" href="css/styles.css?v=7">
 </head>
 <body>
 
@@ -99,9 +99,12 @@
       <div class="hint-overlay" id="hintOverlay"></div>
     </section>
 
+    <!-- ABA PARA ABRIR O PAINEL -->
+    <div class="panel-toggle-tab" onclick="toggleMobilePanel()" title="Abrir propriedades">◀ Propriedades</div>
+
     <!-- PANEL RIGHT -->
     <aside class="panel-right" id="panelRight">
-      <div class="mobile-close-btn" onclick="closeMobilePanel()">✕</div>
+      <div class="panel-close-btn" onclick="closeMobilePanel()" title="Fechar painel">✕</div>
       <div class="panel-tabs">
         <div class="panel-tab active" id="tab-props" onclick="switchTab('props')">Propriedades</div>
       </div>
@@ -114,6 +117,7 @@
   <footer class="statusbar">
     <span>🛠️ Ferramenta: <strong id="sb-tool">Selecionar</strong></span>
     <span>🏢 POPs: <strong id="sb-pops">0</strong></span>
+    <span id="sb-sync" style="margin-left:auto;"></span>
   </footer>
 
   <!-- TOAST -->
@@ -144,7 +148,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
   <!-- App JS (ordem importa!) -->
-  <script src="js/supabase-client.js?v=55"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js?v=1"></script>
   <script src="js/state.js?v=55"></script>
   <script src="js/utils.js?v=55"></script>
   <script src="js/optical.js?v=55"></script>
@@ -157,7 +165,7 @@
   <script src="js/ruler.js?v=55"></script>
   <script src="js/photos.js?v=55"></script>
   <script src="js/panel.js?v=55"></script>
-  <script src="js/storage.js?v=55"></script>
+  <script src="js/storage.js?v=56"></script>
   <script src="js/kml_export.js?v=55"></script>
   <script src="js/report.js?v=55"></script>
   <script src="js/app.js?v=55"></script>

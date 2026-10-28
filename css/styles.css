@@ -216,15 +216,61 @@ path.leaflet-interactive:focus {
 /* ============================================================
    PANEL DIREITO
    ============================================================ */
+.workspace { position: relative; }
+
+/* Gaveta lateral: oculta por padrão, abre sobre o mapa */
 .panel-right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: var(--panel-w);
   background: var(--surface);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  flex-shrink: 0;
+  z-index: 1500;
+  box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.panel-right.mobile-open { transform: translateX(0); }
+
+.panel-close-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  color: var(--text3);
+  cursor: pointer;
+  z-index: 50;
+}
+.panel-close-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+/* Aba na borda direita para abrir o painel manualmente */
+.panel-toggle-tab {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 1400;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 12px 6px;
+  writing-mode: vertical-rl;
+  cursor: pointer;
+  transition: .2s;
+}
+.panel-toggle-tab:hover { color: var(--primary); }
 
 .panel-tabs {
   display: flex;
@@ -752,6 +798,7 @@ path.leaflet-interactive:focus {
 
 /* Esconde no Desktop */
 .mobile-close-btn { display: none; }
+@media (max-width: 768px) { .panel-toggle-tab { display: none; } }
 .mobile-hamburger-btn { display: none; }
 
 
@@ -947,6 +994,7 @@ path.leaflet-interactive:focus {
 
 /* Esconde no Desktop */
 .mobile-close-btn { display: none; }
+@media (max-width: 768px) { .panel-toggle-tab { display: none; } }
 .mobile-hamburger-btn { display: none; }
 
 
