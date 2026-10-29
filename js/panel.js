@@ -202,8 +202,8 @@ function renderPOPProps(pop) {
         <details class="pon-card configured" ${isOpen} ontoggle="window.openPonDetails = window.openPonDetails || {}; window.openPonDetails['${detailsKey}'] = this.open" style="display:block; padding:0; border:1px solid var(--border); background:var(--bg); border-radius:8px; margin-bottom:10px;">
           <summary class="pon-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px; cursor:pointer; list-style:none; outline:none; user-select:none;">
             <div style="display:flex; align-items:center; gap:10px;">
-               <div class="pon-color-bar" style="background:${pon.color}; width:6px; height:24px; border-radius:3px;"></div>
-               <span class="pon-badge" style="background:${pon.color}20; color:${pon.color}; border:1px solid ${pon.color}44">
+               <div class="pon-color-bar" style="background:${pon.color}; width:6px; height:24px; border-radius:3px; border:1px solid rgba(255,255,255,0.4);"></div>
+               <span class="pon-badge" style="background:${pon.color}20; color:${pon.color === '#000000' ? 'var(--text)' : pon.color}; border:1px solid ${pon.color === '#000000' ? '#94a3b8' : pon.color + '44'}">
                  PON ${localPonId}
                </span>
                <div style="display:flex; flex-direction:column;">
@@ -230,13 +230,15 @@ function renderPOPProps(pop) {
             </div>
             <div class="pon-field-row">
               <div class="pon-field" style="flex:1">
-                <label>Cor da Rota</label>
-                <select onchange="updatePonRota('${pop.id}', ${i}, 'color', this.value)">
+                <label>Cor da Rota: <b style="color:var(--text);">${routeColorName(pon.color)}</b></label>
+                <div class="color-swatches">
                   ${ROUTE_COLORS.map(c =>
-                    `<option value="${c.hex}" ${pon.color === c.hex ? 'selected' : ''}
-                      style="color:${c.hex}">${c.name}</option>`
+                    `<button type="button" class="color-swatch ${pon.color === c.hex ? 'active' : ''}" title="${c.name}"
+                       onclick="updatePonRota('${pop.id}', ${i}, 'color', '${c.hex}')">
+                       <span class="color-dot" style="background:${c.hex}"></span>${c.name}
+                     </button>`
                   ).join('')}
-                </select>
+                </div>
               </div>
             </div>
 
@@ -582,7 +584,7 @@ function renderCableProps(cable) {
       // Fibra morta (após a CEO) - SEM SELECTOR DE RAMAL
       html += `
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid #dc2626; opacity:0.8;">
-          <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+          <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
           <div style="flex:1;">
             <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">${fiberLabel(i, cable.fibers)}</div>
             <div style="width:100%; font-size:11px; padding:4px; background:rgba(220, 38, 38, 0.1); border:1px solid rgba(220, 38, 38, 0.4); color:#ef4444; border-radius:4px;">
@@ -625,7 +627,7 @@ function renderCableProps(cable) {
 
       html += `
         <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:6px; border-radius:6px; border:1px solid var(--border);">
-          <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+          <div style="width:16px; height:16px; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
           <div style="flex:1;">
             <div style="font-size:10px; font-weight:600; margin-bottom:2px; color:var(--text2)">${fiberLabel(i, cable.fibers)}</div>
             ${fiberControl}
@@ -765,7 +767,7 @@ function renderSpliceProps(splice) {
       }
       rows += `
         <div style="display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:4px; border:1px solid ${info ? 'rgba(16,185,129,0.35)' : 'var(--border)'}; background:${info ? 'rgba(16,185,129,0.06)' : 'transparent'}; opacity:${info ? 1 : 0.65};">
-          <div style="width:12px; height:12px; flex-shrink:0; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+          <div style="width:12px; height:12px; flex-shrink:0; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
           <div style="flex:1; min-width:0;">
             <div style="font-size:10px; color:var(--text2);">${fiberLabel(j, sourceCable.fibers)}</div>
             ${detail}
@@ -794,7 +796,7 @@ function renderSpliceProps(splice) {
     html += `
       <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; margin-bottom:15px; padding:10px;">
         <div style="text-align:center; font-size:11px; font-weight:bold; margin-bottom:10px; color:var(--text);">Fusão: ${sourceCable ? sourceCable.name : 'Tronco'} ➡️ ${dc.name}</div>
-        <div style="display:flex; gap:10px;">
+        <div class="fusion-board">
 
           <!-- Left Column (Trunk Fibers) -->
           <div style="flex:1; display:flex; flex-direction:column; gap:6px; border-right:1px dashed var(--border); padding-right:5px;">
@@ -847,35 +849,35 @@ function renderSpliceProps(splice) {
        if (isInputFiber) {
           html += `
             <div style="padding:4px; border-radius:4px; border:1px solid rgba(168, 85, 247, 0.4); background:rgba(168, 85, 247, 0.1); display:flex; align-items:center; gap:6px; opacity:0.8;" title="No Splitter">
-              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; color:#d8b4fe; font-weight:bold;">F${j} (No Splitter)</span>${signalTag(fiberSignals[j])}
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+              <span style="font-size:9px; color:#d8b4fe; font-weight:bold;">F${j} ${srcFColor.name} (no splitter)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else if (uses >= limit) {
           html += `
             <div style="padding:4px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:6px; opacity:0.5;">
-              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; color:var(--text2)">F${j} (Usada)</span>${signalTag(fiberSignals[j])}
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+              <span style="font-size:9px; color:var(--text2)">F${j} ${srcFColor.name} (usada)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else if (cutUpstreamFibers[j]) {
           html += `
             <div style="padding:4px; border-radius:4px; border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.05); display:flex; align-items:center; gap:6px; opacity:0.6;" title="Cortada Antes">
-              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; color:var(--red)">F${j} (Cortada)</span>${signalTag(fiberSignals[j])}
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+              <span style="font-size:9px; color:var(--red)">F${j} ${srcFColor.name} (cortada)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else if (usedDownstreamFibers[j]) {
           html += `
             <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:4px; border-radius:4px; border:1px solid #eab308; background:rgba(234, 179, 8, 0.1); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Usada na Frente">
-              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; font-weight:600; color:#ca8a04;">F${j} (Na frente)</span>${signalTag(fiberSignals[j])}
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+              <span style="font-size:9px; font-weight:600; color:#ca8a04;">F${j} ${srcFColor.name} (na frente)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else {
           html += `
             <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:4px; border-radius:4px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
-              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+              <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
               <span style="font-size:9px; font-weight:600;">F${j} - ${srcFColor.name}</span>${signalTag(fiberSignals[j])}
             </div>
           `;
@@ -888,7 +890,7 @@ function renderSpliceProps(splice) {
     if (splice.splitter) {
         html += `
           <!-- Middle Column (Splitter) -->
-          <div style="flex:1.2; display:flex; flex-direction:column; align-items:center; border-right:1px dashed var(--border); padding:0 5px;">
+          <div class="fb-splitter" style="flex:1.2; display:flex; flex-direction:column; align-items:center; border-right:1px dashed var(--border); padding:0 5px;">
             <div style="font-size:10px; font-weight:bold; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:4px;">
               <div style="width:0; height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; border-left:8px solid var(--primary);"></div>
               ${splitterName(splice.splitter)}
@@ -904,8 +906,8 @@ function renderSpliceProps(splice) {
             const infColor = FIBER_COLORS[(inf-1) % FIBER_COLORS.length];
             html += `
               <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(168, 85, 247, 0.15); padding:4px 8px; border-radius:4px; border:1px solid rgba(168, 85, 247, 0.4);">
-                <div style="width:10px; height:10px; border-radius:50%; background:${infColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                <span style="font-size:10px; font-weight:bold; color:#d8b4fe;">F${inf}</span>${signalTag(fiberSignals[inf])}
+                <div style="width:10px; height:10px; border-radius:50%; background:${infColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+                <span style="font-size:10px; font-weight:bold; color:#d8b4fe;">F${inf} ${infColor.name}</span>${signalTag(fiberSignals[inf])}
                 <span onclick="removeSplitterInput('${splice.id}')" style="cursor:pointer; color:#ef4444; font-size:10px; margin-left:4px; font-weight:bold;" title="Remover Fibra">✕</span>
               </div>
             `;
@@ -926,22 +928,22 @@ function renderSpliceProps(splice) {
             if (trunkFiberUses[sId]) {
                html += `
                  <div style="padding:4px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:4px; opacity:0.5;">
-                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                   <span style="font-size:8px; color:var(--text2)">${splitterOutLabel(splice.splitter, sId)}</span>
+                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+                   <span style="font-size:8px; color:var(--text2)">${splitterOutLabel(splice.splitter, sId)} · ${outColor.name}</span>
                  </div>
                `;
             } else if (!splice.splitter.inputFiber) {
                html += `
                  <div style="padding:4px; border-radius:4px; border:1px solid var(--border); background:var(--surface2); display:flex; align-items:center; gap:4px; opacity:0.3;" title="Alimente o splitter primeiro!">
-                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                   <span style="font-size:8px; color:var(--text2)">${splitterOutLabel(splice.splitter, sId)}</span>
+                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+                   <span style="font-size:8px; color:var(--text2)">${splitterOutLabel(splice.splitter, sId)} · ${outColor.name}</span>
                  </div>
                `;
             } else {
                html += `
                  <div draggable="true" ondragstart="dragFiber(event, '${sId}')" style="padding:4px; border-radius:4px; border:1px solid ${outColor.hex}; background:rgba(59, 130, 246, 0.05); display:flex; align-items:center; gap:4px; cursor:grab; box-shadow:0 1px 2px rgba(0,0,0,0.2);" title="${outColor.name}">
-                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                   <span style="font-size:8px; font-weight:bold; color:var(--text1)">${splitterOutLabel(splice.splitter, sId)}</span>
+                   <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+                   <span style="font-size:8px; font-weight:bold; color:var(--text1)">${splitterOutLabel(splice.splitter, sId)} · ${outColor.name}</span>
                  </div>
                `;
             }
@@ -963,11 +965,11 @@ function renderSpliceProps(splice) {
            let srcFColor, srcLabel, isDead;
            if (typeof currentSrcFiber === 'string' && currentSrcFiber.startsWith('S')) {
                srcFColor = { hex: '#3b82f6' }; // Azul primary
-               srcLabel = 'SPL ' + currentSrcFiber.replace('S', 'OUT ');
+               srcLabel = splice.splitter ? 'SPL ' + splitterOutLabel(splice.splitter, currentSrcFiber) : 'SPL ' + currentSrcFiber;
                isDead = false; // Splitter local não "morre" no meio do caminho, depende do input dele (o que verificamos no setFusion)
            } else {
                srcFColor = FIBER_COLORS[(parseInt(currentSrcFiber)-1) % FIBER_COLORS.length];
-               srcLabel = 'F' + currentSrcFiber;
+               srcLabel = 'F' + currentSrcFiber + ' ' + srcFColor.name;
                isDead = cutUpstreamFibers[currentSrcFiber];
            }
 
@@ -975,9 +977,9 @@ function renderSpliceProps(splice) {
              html += `
                <div style="padding:6px; border-radius:4px; border:1px solid #ef4444; background:rgba(239, 68, 68, 0.15); display:flex; justify-content:space-between; align-items:center;" title="Atenção: A fibra de origem ${srcLabel} foi cortada em uma CEO anterior. O sinal não chega aqui!">
                  <div style="display:flex; align-items:center; gap:4px; opacity:0.6;">
-                   <div style="width:8px; height:8px; border-radius:2px; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
-                   <span style="font-size:10px; font-weight:bold; color:#fca5a5;"><strike>${srcLabel}</strike> (Sem Sinal) ➡️ F${i}</span>
-                   <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                   <div style="width:8px; height:8px; border-radius:2px; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+                   <span style="font-size:10px; font-weight:bold; color:#fca5a5;"><strike>${srcLabel}</strike> (Sem Sinal) ➡️ F${i} ${subFColor.name}</span>
+                   <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
                  </div>
                  <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Remover Fusão Morta">✖</button>
                </div>
@@ -986,9 +988,9 @@ function renderSpliceProps(splice) {
              html += `
                <div style="padding:6px; border-radius:4px; border:1px solid #f97316; background:rgba(249, 115, 22, 0.15); display:flex; justify-content:space-between; align-items:center;">
                  <div style="display:flex; align-items:center; gap:4px;">
-                   <div style="width:8px; height:8px; border-radius:2px; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
-                   <span style="font-size:10px; font-weight:bold; color:#fdba74;">${srcLabel} ➡️ F${i}</span>
-                   <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                   <div style="width:8px; height:8px; border-radius:2px; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+                   <span style="font-size:10px; font-weight:bold; color:#fdba74;">${srcLabel} ➡️ F${i} ${subFColor.name}</span>
+                   <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
                    ${signalTag(getRamalInfo(dc.fiberMapping[i]))}
                  </div>
                  <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer Fusão">✖</button>
@@ -999,8 +1001,8 @@ function renderSpliceProps(splice) {
            html += `
              <div ondragover="allowDrop(event)" ondrop="dropFiber(event, '${splice.id}', '${dc.id}', ${i})"
                   style="padding:6px; border-radius:4px; border:1px dashed var(--border); background:rgba(255,255,255,0.02); display:flex; align-items:center; gap:6px; min-height:28px;">
-               <div style="width:12px; height:12px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-               <span style="font-size:10px; color:var(--text2)">F${i} (Solte a fibra)</span>
+               <div style="width:12px; height:12px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.65);"></div>
+               <span style="font-size:10px; color:var(--text2)">F${i} ${subFColor.name} — solte a fibra</span>
              </div>
            `;
        }

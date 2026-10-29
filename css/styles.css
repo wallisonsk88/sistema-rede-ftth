@@ -19,7 +19,7 @@
   --text:      #f1f5f9;
   --text2:     #94a3b8;
   --text3:     #475569;
-  --panel-w:   380px;
+  --panel-w:   440px;
   --topbar-h:  54px;
   --radius:    10px;
   --shadow:    0 4px 24px rgba(0,0,0,0.5);
@@ -692,7 +692,37 @@ path.leaflet-interactive:focus {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
+.pon-field input, .pon-field select { width: 100%; min-width: 0; }
+
+/* Cores da rota: amostra + nome */
+.color-swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.color-swatch {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text2);
+  font-size: 10px; font-family: 'Inter', sans-serif;
+  cursor: pointer; text-align: left;
+}
+.color-swatch:hover { border-color: var(--text3); }
+.color-swatch.active { border-color: var(--primary); color: var(--text); font-weight: 700; background: rgba(249,115,22,0.08); }
+.color-dot { width: 12px; height: 12px; flex-shrink: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,0.65); }
+
+/* Quadro de fusão da CEO: cabe no painel; o splitter fica em cima, tronco e derivado lado a lado */
+.fusion-board { display: flex; flex-wrap: wrap; gap: 10px; }
+.fusion-board > div { flex: 1 1 0; min-width: 0; }
+.fusion-board > .fb-splitter {
+  order: -1;
+  flex: 1 1 100% !important;
+  border-right: none !important;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 10px !important;
+}
+.fusion-board span { overflow-wrap: anywhere; }
 .pon-field label {
   font-size: 10px;
   color: var(--text2);

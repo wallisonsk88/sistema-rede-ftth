@@ -2,7 +2,7 @@
  * pop.js — Criação, marcadores e propriedades do POP / OLT
  */
 
-// Cores disponíveis para rotas (padrão ABNT fibra óptica)
+// Cores disponíveis para rotas: código de cores ABNT das fibras (mesmos tons do cabo)
 const ROUTE_COLORS = [
   { hex: '#10b981', name: 'Verde' },
   { hex: '#facc15', name: 'Amarelo' },
@@ -12,11 +12,17 @@ const ROUTE_COLORS = [
   { hex: '#8b5cf6', name: 'Violeta' },
   { hex: '#a16207', name: 'Marrom' },
   { hex: '#ec4899', name: 'Rosa' },
+  { hex: '#000000', name: 'Preto' },
   { hex: '#475569', name: 'Cinza' },
   { hex: '#f97316', name: 'Laranja' },
   { hex: '#06b6d4', name: 'Aqua' },
-  { hex: '#84cc16', name: 'Lima' },
 ];
+
+/** Nome da cor da rota (rotas antigas podem ter uma cor fora da lista, ex.: Lima) */
+function routeColorName(hex) {
+  const c = ROUTE_COLORS.find(c => c.hex === hex);
+  return c ? c.name : (hex === '#84cc16' ? 'Lima' : hex);
+}
 
 /**
  * Mapeia o índice global de cada porta PON para a OLT dona dela.
