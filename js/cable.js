@@ -710,18 +710,50 @@ function syncCTOsWithSignal(offsets) {
 }
 
 /** Destaque (Highlight) no ramal selecionado pelo cabo */
-window.highlightRamal = function(popId, ramalId) {
+/**
+ * Lupa da rota (porta PON): destaca no mapa todos os ramais dela, da OLT até o fim,
+ * e aproxima o mapa no caminho. Clicar de novo desliga.
+ */
+window.highlightPon = function(popId, ponIndex) {
+  const key = `pon:${popId}:${ponIndex}`;
+  if (window.activeRamalTrace === key) {
+    clearHighlight();
+    return;
+  }
+  const pop = STATE.olts.find(o => o.id === popId);
+  const pon = pop && (pop.pons || []).find(p => p.index === ponIndex);
+  if (!pon) return;
+
+  clearHighlight();
+  (pon.ramais || []).forEach(r => highlightRamal(popId, r.id, true));
+  window.activeRamalTrace = key;
+
+  const lines = window.activeTraceLines || [];
+  if (lines.length === 0) {
+    toast('⚠️ Nenhum ramal desta rota está ligado numa fibra do cabo tronco.');
+    window.activeRamalTrace = null;
+    return;
+  }
+  map.fitBounds(L.featureGroup(lines).getBounds(), { padding: [40, 40], maxZoom: 18 });
+  toast(`🔍 ${pon.rotaName}: ${pon.ramais.length} ramal(is) destacado(s) no mapa`);
+}
+
+/** Lupa do ramal. `keep` = soma ao destaque atual (usado pela lupa da rota) */
+window.highlightRamal = function(popId, ramalId, keep) {
   // Se clicar na lupa do mesmo ramal já destacado, atua como um botão liga/desliga (toggle)
-  if (window.activeRamalTrace === ramalId) {
+  if (!keep && window.activeRamalTrace === ramalId) {
     clearHighlight();
     return;
   }
 
   // Limpa traços anteriores
-  if (window.activeTraceLines) {
-    window.activeTraceLines.forEach(l => map.removeLayer(l));
+  if (!keep) {
+    if (window.activeTraceLines) {
+      window.activeTraceLines.forEach(l => map.removeLayer(l));
+    }
+    window.activeTraceLines = [];
   }
-  window.activeTraceLines = [];
+  window.activeTraceLines = window.activeTraceLines || [];
   window.activeRamalTrace = ramalId; // Memoriza qual ramal está ativo
 
   // Encontra a cor correta da PON para este ramal e o objeto do ramal

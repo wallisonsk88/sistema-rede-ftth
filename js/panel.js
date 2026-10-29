@@ -216,7 +216,9 @@ function renderPOPProps(pop) {
             </div>
             <div style="display:flex; align-items:center; gap:10px;">
                <span style="font-size:10px; color:var(--text3);">▼ expandir</span>
-               <button class="pon-remove-btn" onclick="removePonRota('${pop.id}', ${i})" title="Liberar porta">✕</button>
+               <button onclick="event.preventDefault(); event.stopPropagation(); highlightPon('${pop.id}', ${i})" title="Ver no mapa para onde vai esta rota"
+                 style="background:none; border:none; cursor:pointer; font-size:15px; padding:2px; opacity:${(pon.ramais || []).some(r => getPopRootCables(pop.id).some(c => Object.values(c.fiberMapping || {}).includes(r.id))) ? 1 : 0.35};">🔍</button>
+               <button class="pon-remove-btn" onclick="event.preventDefault(); event.stopPropagation(); removePonRota('${pop.id}', ${i})" title="Liberar porta">✕</button>
             </div>
           </summary>
           <div class="pon-content" style="padding:0 10px 10px 10px; border-top:1px solid var(--border); margin-top:5px; padding-top:10px;">
