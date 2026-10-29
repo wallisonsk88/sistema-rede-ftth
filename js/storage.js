@@ -84,7 +84,7 @@ function serializeState() {
       popId: c.popId,
       sourceType: c.sourceType,
       sourceId: c.sourceId,
-      oltId: c.oltId,
+      oltIds: getCableOltIds(c),
       path: c.path,
       fibers: c.fibers,
       fiberMapping: c.fiberMapping,

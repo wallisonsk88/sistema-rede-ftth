@@ -169,7 +169,7 @@ function renderPOPProps(pop) {
 
           <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);">
             <label style="font-size:10px; color:var(--primary); font-weight:bold;">🔗 Cabo Tronco (Backbone) Vinculado</label>
-            <div style="font-size:9px; color:var(--text3); margin-bottom:4px;">Selecione o cabo que sairá desta OLT. Apenas rotas desta OLT irão para ele.</div>
+            <div style="font-size:9px; color:var(--text3); margin-bottom:4px;">Marque os cabos que saem desta OLT. Um cabo pode sair de mais de uma OLT: cada fibra mostra de qual OLT ela vem.</div>
             <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px; background:var(--bg); padding:6px; border-radius:4px; border:1px solid var(--border);">
                ${(() => {
                   const rootCables = getPopRootCables(pop.id);
@@ -177,8 +177,11 @@ function renderPOPProps(pop) {
 
                   return rootCables.map(c =>
                      `<label style="font-size:11px; display:flex; align-items:center; gap:6px; color:var(--text); cursor:pointer;">
-                        <input type="checkbox" ${c.oltId === olt.id ? 'checked' : ''} onchange="window.toggleCableOltLink('${c.id}', '${olt.id}', this.checked)" style="accent-color:var(--primary);">
-                        ${c.name || 'Cabo Tronco ' + c.fibers + ' FO'} ${c.oltId && c.oltId !== olt.id ? '<span style="color:var(--text3); font-size:9px;">(Vinculado a outra OLT)</span>' : ''}
+                        <input type="checkbox" ${getCableOltIds(c).includes(olt.id) ? 'checked' : ''} onchange="window.toggleCableOltLink('${c.id}', '${olt.id}', this.checked)" style="accent-color:var(--primary);">
+                        ${c.name || 'Cabo Tronco ' + c.fibers + ' FO'} ${(() => {
+                          const others = getCableOltIds(c).filter(id => id !== olt.id).map(id => (pop.oltEquipments.find(o => o.id === id) || {}).name).filter(Boolean);
+                          return others.length ? `<span style="color:var(--text3); font-size:9px;">(também na ${others.join(', ')})</span>` : '';
+                        })()}
                       </label>`
                   ).join('');
                })()}
@@ -257,7 +260,7 @@ function renderPOPProps(pop) {
                   const f = Object.keys(pc.fiberMapping || {}).find(k => pc.fiberMapping[k] === ramal.id);
                   if (f) { mappedFiberNum = f; mappedValue = pc.id + ':' + f; break; }
                 }
-                const fiberOptions = popCables.filter(c => !c.oltId || c.oltId === ponToOltMap[pon.index]).map(c => {
+                const fiberOptions = popCables.filter(c => cableAcceptsOlt(c, ponToOltMap[pon.index]) || mappedValue.startsWith(c.id + ':')).map(c => {
                   let opts = '';
                   for (let f = 1; f <= c.fibers; f++) {
                     const value = c.id + ':' + f;
@@ -512,8 +515,12 @@ function renderCableProps(cable) {
      rootPopId = rootPop.id;
      const ponToOltMap = buildPonToOltMap(rootPop);
      (rootPop.pons || []).forEach(pon => {
-       if (cable.oltId && ponToOltMap[pon.index] !== cable.oltId) return;
-       if(pon.ramais) pon.ramais.forEach(r => allRamais.push({ id: r.id, name: getRamalInfo(r.id).label, color: pon.color }));
+       const accepts = cableAcceptsOlt(cable, ponToOltMap[pon.index]);
+       (pon.ramais || []).forEach(r => {
+         if (accepts || Object.values(cable.fiberMapping || {}).includes(r.id)) {
+           allRamais.push({ id: r.id, name: getRamalInfo(r.id).label, color: pon.color });
+         }
+       });
      });
   }
 
@@ -525,12 +532,15 @@ function renderCableProps(cable) {
     <div style="font-size:10px; opacity:0.8; margin-bottom:10px;">${originName}</div>
     ${rootPopId && isRootCable(cable) ? `
       <div class="prop-group">
-        <label style="color:var(--primary); font-weight:bold;">Conectado na OLT (Opcional)</label>
-        <select class="input-full" onchange="cableUpdate('${cable.id}', 'oltId', this.value)">
-          <option value="">-- Listar todas as rotas do POP --</option>
-          ${(STATE.olts.find(o => o.id === rootPopId).oltEquipments || []).map(o => `<option value="${o.id}" ${cable.oltId === o.id ? 'selected' : ''}>${o.name}</option>`).join('')}
-        </select>
-        <div style="font-size:9px; color:var(--text3); margin-top:2px;">Selecione para filtrar os ramais abaixo apenas dessa OLT.</div>
+        <label style="color:var(--primary); font-weight:bold;">Sai das OLTs (Opcional)</label>
+        <div style="display:flex; flex-wrap:wrap; gap:6px 12px; background:var(--bg); padding:6px 8px; border-radius:6px; border:1px solid var(--border);">
+          ${(STATE.olts.find(o => o.id === rootPopId).oltEquipments || []).map(o => `
+            <label style="font-size:11px; display:flex; align-items:center; gap:5px; color:var(--text); cursor:pointer; margin:0; font-weight:normal;">
+              <input type="checkbox" ${getCableOltIds(cable).includes(o.id) ? 'checked' : ''} onchange="toggleCableOltLink('${cable.id}', '${o.id}', this.checked)" style="accent-color:var(--primary);">
+              ${o.name}
+            </label>`).join('')}
+        </div>
+        <div style="font-size:9px; color:var(--text3); margin-top:2px;">Marque uma ou mais OLTs para listar só os ramais delas nas fibras abaixo. Nenhuma marcada = todas as OLTs do POP.</div>
       </div>
     ` : ''}
 
@@ -1231,11 +1241,10 @@ window.updateCTOField = function(popId, ponIndex, ramalId, ctoId, field, value) 
 window.toggleCableOltLink = function(cableId, oltId, isLinked) {
    const cable = STATE.cables.find(c => c.id === cableId);
    if (cable) {
-       if (isLinked) {
-           cable.oltId = oltId;
-       } else {
-           if (cable.oltId === oltId) cable.oltId = null;
-       }
+       const ids = getCableOltIds(cable).filter(id => id !== oltId);
+       if (isLinked) ids.push(oltId);
+       cable.oltIds = ids;
+       delete cable.oltId;
    }
 
    saveLocal();

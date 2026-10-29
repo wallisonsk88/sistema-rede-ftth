@@ -427,7 +427,7 @@ function autoConnectRamais(popId, ramalIds, cables) {
   (pop.pons || []).forEach(pon => (pon.ramais || []).forEach(ramal => {
     if (connected.has(ramal.id) || (ramalIds && !ramalIds.includes(ramal.id))) return;
     for (const cable of cables) {
-      if (cable.oltId && cable.oltId !== ponToOlt[pon.index]) continue;
+      if (!cableAcceptsOlt(cable, ponToOlt[pon.index])) continue;
       if (!cable.fiberMapping) cable.fiberMapping = {};
       let f = 1;
       while (f <= cable.fibers && cable.fiberMapping[f]) f++;
@@ -439,6 +439,21 @@ function autoConnectRamais(popId, ramalIds, cables) {
     }
   }));
   return count;
+}
+
+/**
+ * OLTs ligadas ao cabo tronco. Um mesmo cabo pode levar fibras de várias OLTs do POP;
+ * lista vazia = aceita qualquer OLT. (Projetos antigos guardavam só uma em `oltId`.)
+ */
+function getCableOltIds(cable) {
+  if (Array.isArray(cable.oltIds)) return cable.oltIds;
+  return cable.oltId ? [cable.oltId] : [];
+}
+
+/** O cabo tronco pode receber ramais desta OLT? */
+function cableAcceptsOlt(cable, oltId) {
+  const ids = getCableOltIds(cable);
+  return ids.length === 0 || ids.includes(oltId);
 }
 
 /** Cabo tronco: sai direto do POP (os demais saem de uma CEO) */

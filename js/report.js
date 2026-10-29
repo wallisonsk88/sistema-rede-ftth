@@ -35,7 +35,9 @@ function generateReportData(selectedOltId = '') {
   let allowedSplices = new Set();
 
   if (selectedOltId) {
-      let queue = STATE.cables.filter(c => c.oltId === selectedOltId);
+      // Cabos tronco ligados à OLT ou com alguma fibra saindo dela
+      let queue = STATE.cables.filter(c => isRootCable(c) && (getCableOltIds(c).includes(selectedOltId)
+        || Object.values(c.fiberMapping || {}).some(r => { const info = getRamalInfo(r); return info && info.olt && info.olt.id === selectedOltId; })));
       while(queue.length > 0) {
           let currentCable = queue.shift();
           if (allowedCables.has(currentCable.id)) continue;
