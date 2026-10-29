@@ -712,6 +712,59 @@ function renderSpliceProps(splice) {
       </button>
   `;
 
+  // Sinal de cada fibra do cabo de entrada nesta CEO: de qual OLT/PON/rota/ramal ela vem
+  // e o que acontece com ela aqui (sangria, splitter ou passa direto)
+  const fiberSignals = {};
+  if (sourceCable) {
+    const alongUses = getSpliceUsesAlong(sourceCable);
+    const here = alongUses.find(u => u.splice.id === splice.id);
+    const cuts = getFiberCuts(sourceCable);
+    let active = 0;
+    let rows = '';
+    for (let j = 1; j <= sourceCable.fibers; j++) {
+      const info = getRamalInfo(getFiberSignalAt(sourceCable, j, [splice.lat, splice.lng]));
+      fiberSignals[j] = info;
+      const fColor = FIBER_COLORS[(j - 1) % FIBER_COLORS.length];
+      let detail;
+      if (info) {
+        active++;
+        const sangrias = [];
+        derivedCables.forEach(dc => Object.entries(splice.fusions[dc.id] || {}).forEach(([childFiber, src]) => {
+          if (String(src) === String(j)) sangrias.push(`${dc.name} F${childFiber}`);
+        }));
+        const next = alongUses.filter(u => u.dist > here.dist && u.fibers.has(j)).sort((a, b) => a.dist - b.dist)[0];
+        const action = splice.splitter && splice.splitter.inputFiber == j ? `🎛️ Entra no splitter 1:${splice.splitter.outputs}`
+          : sangrias.length ? `✂️ Sangria ➡️ ${sangrias.join(', ')}`
+          : `➡️ Passa direto${next ? ` (usada na ${next.splice.name})` : ''}`;
+        detail = `<div style="font-size:10px; font-weight:600; color:var(--green);">🟢 ${info.label}</div>
+                  <div style="font-size:9px; color:var(--text3);">${action}</div>`;
+      } else {
+        const cut = cuts[j];
+        const cutBefore = cut && cut.splice.id !== splice.id && cut.dist < here.dist;
+        detail = `<div style="font-size:10px; color:var(--text3);">${cutBefore ? `✂️ Cortada na ${cut.splice.name} — sem sinal aqui` : '⚪ Não conectada na OLT'}</div>`;
+      }
+      rows += `
+        <div style="display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:4px; border:1px solid ${info ? 'rgba(16,185,129,0.35)' : 'var(--border)'}; background:${info ? 'rgba(16,185,129,0.06)' : 'transparent'}; opacity:${info ? 1 : 0.65};">
+          <div style="width:12px; height:12px; flex-shrink:0; border-radius:50%; background:${fColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:10px; color:var(--text2);">${fiberLabel(j, sourceCable.fibers)}</div>
+            ${detail}
+          </div>
+        </div>`;
+    }
+    html += `
+      <details open style="margin-bottom:15px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+        <summary style="padding:10px; font-size:11px; font-weight:700; color:var(--text); cursor:pointer; outline:none;">
+          📡 Fibras do ${sourceCable.name} nesta CEO — <span style="color:var(--green);">${active} ativa(s)</span> de ${sourceCable.fibers}
+        </summary>
+        <div style="display:flex; flex-direction:column; gap:4px; padding:0 10px 10px;">${rows}</div>
+      </details>`;
+  }
+  // Etiqueta curta do sinal (rota e ramal) para o quadro de fusão; o texto completo fica no title
+  const signalTag = info => info
+    ? `<span title="${info.label}" style="margin-left:auto; font-size:8px; font-weight:600; color:var(--green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:90px;">🟢 ${info.ramal.name}</span>`
+    : '';
+
   if (derivedCables.length === 0) {
       html += `<div style="font-size:11px; color:var(--text2); text-align:center; padding:20px;">Nenhum cabo derivado ainda. Lance um cabo derivado para começar a fusão.</div></div>`;
       return html;
@@ -775,35 +828,35 @@ function renderSpliceProps(splice) {
           html += `
             <div style="padding:4px; border-radius:4px; border:1px solid rgba(168, 85, 247, 0.4); background:rgba(168, 85, 247, 0.1); display:flex; align-items:center; gap:6px; opacity:0.8;" title="No Splitter">
               <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; color:#d8b4fe; font-weight:bold;">F${j} (No Splitter)</span>
+              <span style="font-size:9px; color:#d8b4fe; font-weight:bold;">F${j} (No Splitter)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else if (uses >= limit) {
           html += `
             <div style="padding:4px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:6px; opacity:0.5;">
               <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; color:var(--text2)">F${j} (Usada)</span>
+              <span style="font-size:9px; color:var(--text2)">F${j} (Usada)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else if (cutUpstreamFibers[j]) {
           html += `
             <div style="padding:4px; border-radius:4px; border:1px solid rgba(239,68,68,0.2); background:rgba(239,68,68,0.05); display:flex; align-items:center; gap:6px; opacity:0.6;" title="Cortada Antes">
               <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; color:var(--red)">F${j} (Cortada)</span>
+              <span style="font-size:9px; color:var(--red)">F${j} (Cortada)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else if (usedDownstreamFibers[j]) {
           html += `
             <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:4px; border-radius:4px; border:1px solid #eab308; background:rgba(234, 179, 8, 0.1); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);" title="Usada na Frente">
               <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; font-weight:600; color:#ca8a04;">F${j} (Na frente)</span>
+              <span style="font-size:9px; font-weight:600; color:#ca8a04;">F${j} (Na frente)</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        } else {
           html += `
             <div draggable="true" ondragstart="dragFiber(event, ${j})" style="padding:4px; border-radius:4px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; gap:6px; cursor:grab; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
               <div style="width:10px; height:10px; border-radius:50%; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-              <span style="font-size:9px; font-weight:600;">F${j} - ${srcFColor.name}</span>
+              <span style="font-size:9px; font-weight:600;">F${j} - ${srcFColor.name}</span>${signalTag(fiberSignals[j])}
             </div>
           `;
        }
@@ -832,7 +885,7 @@ function renderSpliceProps(splice) {
             html += `
               <div style="display:inline-flex; align-items:center; gap:6px; background:rgba(168, 85, 247, 0.15); padding:4px 8px; border-radius:4px; border:1px solid rgba(168, 85, 247, 0.4);">
                 <div style="width:10px; height:10px; border-radius:50%; background:${infColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                <span style="font-size:10px; font-weight:bold; color:#d8b4fe;">F${inf}</span>
+                <span style="font-size:10px; font-weight:bold; color:#d8b4fe;">F${inf}</span>${signalTag(fiberSignals[inf])}
                 <span onclick="removeSplitterInput('${splice.id}')" style="cursor:pointer; color:#ef4444; font-size:10px; margin-left:4px; font-weight:bold;" title="Remover Fibra">✕</span>
               </div>
             `;
@@ -916,6 +969,7 @@ function renderSpliceProps(splice) {
                    <div style="width:8px; height:8px; border-radius:2px; background:${srcFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
                    <span style="font-size:10px; font-weight:bold; color:#fdba74;">${srcLabel} ➡️ F${i}</span>
                    <div style="width:8px; height:8px; border-radius:50%; background:${subFColor.hex}; border:1px solid rgba(255,255,255,0.3);"></div>
+                   ${signalTag(getRamalInfo(dc.fiberMapping[i]))}
                  </div>
                  <button onclick="removeFusion('${splice.id}', '${dc.id}', ${i})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:12px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Desfazer Fusão">✖</button>
                </div>
