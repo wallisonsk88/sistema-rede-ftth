@@ -153,7 +153,7 @@ function finishCable() {
   // sinal, este passa a ser o cabo de entrada dela (o sinal continua de CEO em CEO)
   let endMsg = '';
   const end = obj.path[obj.path.length - 1];
-  const endSplice = STATE.splices.find(s => s.id !== obj.sourceId && map.distance(end, [s.lat, s.lng]) <= 20);
+  const endSplice = STATE.splices.find(s => s.id !== obj.sourceId && !isDownstreamOfSplice(obj, s.id) && map.distance(end, [s.lat, s.lng]) <= 20);
   if (endSplice) {
     obj.path[obj.path.length - 1] = [endSplice.lat, endSplice.lng];
     const current = STATE.cables.find(c => c.id === endSplice.cableId);
@@ -479,10 +479,22 @@ function splitterOutLabel(splitter, src) {
   return `OUT ${k}`;
 }
 
+/** O cabo sai (direta ou indiretamente) desta CEO? Ele não pode ser a entrada dela */
+function isDownstreamOfSplice(cable, spliceId) {
+  const seen = new Set();
+  while (cable && cable.sourceType === 'splice' && !seen.has(cable.id)) {
+    if (cable.sourceId === spliceId) return true;
+    seen.add(cable.id);
+    const sp = STATE.splices.find(s => s.id === cable.sourceId);
+    cable = sp ? STATE.cables.find(c => c.id === sp.cableId) : null;
+  }
+  return false;
+}
+
 /** Cabos que passam ou terminam na CEO (até 20 m), candidatos a cabo de entrada */
 function getCablesAtSplice(splice) {
   return STATE.cables
-    .filter(c => !(c.sourceType === 'splice' && c.sourceId === splice.id))
+    .filter(c => !isDownstreamOfSplice(c, splice.id))
     .map(c => {
       const snap = findClosestOnPath([splice.lat, splice.lng], c.path);
       return snap ? { cable: c, meters: map.distance([splice.lat, splice.lng], snap.latlng) } : null;
@@ -555,6 +567,8 @@ function getCtoSignal(cto) {
  * passa a pertencer ao ramal que chega na fibra dela.
  */
 function recomputeSignals() {
+  repairSpliceInputs();
+
   STATE.cables.forEach(c => {
     if (!c.fiberMapping) c.fiberMapping = {};
     if (!isRootCable(c)) {
@@ -598,6 +612,28 @@ function recomputeSignals() {
   }
 
   syncCTOsWithSignal(offsets);
+}
+
+/**
+ * CEO cujo cabo de entrada foi apagado (ex.: cabo excluído e redesenhado) é religada no
+ * cabo que passa ou chega nela com mais fibras ativas (ou o mais perto). As fusões são
+ * mantidas, então o sinal volta a correr para os cabos derivados e CTOs.
+ */
+function repairSpliceInputs() {
+  const repaired = [];
+  STATE.splices.forEach(sp => {
+    if (STATE.cables.some(c => c.id === sp.cableId)) return;
+    const pos = [sp.lat, sp.lng];
+    const best = getCablesAtSplice(sp)
+      .map(x => ({ ...x, active: countActiveFibersAt(x.cable, pos) }))
+      .sort((a, b) => b.active - a.active || a.meters - b.meters)[0];
+    if (!best) return;
+    sp.cableId = best.cable.id;
+    repaired.push(`${sp.name} → ${best.cable.name}`);
+  });
+  if (repaired.length && typeof toast === 'function') {
+    toast(`🔌 CEO religada no cabo que chega nela: ${repaired.join(', ')}`);
+  }
 }
 
 let lastCtoSignature = null;

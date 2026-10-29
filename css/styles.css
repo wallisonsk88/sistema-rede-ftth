@@ -341,6 +341,23 @@ path.leaflet-interactive:focus {
 .fp-select option { background: #1a2235; }
 .fp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
+/* Campos do painel do cabo (mesmo visual dos fp-*) */
+.prop-group { margin-bottom: 12px; }
+.prop-group > label { font-size: 11px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 5px; }
+.input-full {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  outline: none;
+}
+.input-full option { background: var(--bg); color: var(--text); }
+.input-full:focus { border-color: var(--primary); }
+
 /* Info chip */
 .info-chip {
   display: flex;
@@ -713,7 +730,7 @@ path.leaflet-interactive:focus {
   .logo { font-size: 14px; gap: 5px; }
   .logo-icon { width: 24px; height: 24px; font-size: 12px; }
   .project-name-input { width: 100px; font-size: 12px; }
-  
+
   .topbar-btn { padding: 8px; flex-shrink: 0; }
   /* Oculta os textos dos botões de ação e deixa só o ícone */
   .topbar-btn { font-size: 16px; border:none; background: transparent; }
@@ -744,7 +761,7 @@ path.leaflet-interactive:focus {
     gap: 5px;
   }
   .tool-group-sep { width: 1px; height: 30px; margin: 0 5px; flex-shrink: 0; }
-  
+
   .tool-btn { width: 45px; height: 45px; flex-shrink: 0; }
   .tool-btn::after { display: none !important; } /* sem tooltip no touch */
 
@@ -766,7 +783,7 @@ path.leaflet-interactive:focus {
     z-index: 2000;
     transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  
+
   /* Quando aberto */
   .panel-right.mobile-open {
     right: 0; /* Desliza para dentro */
@@ -786,7 +803,7 @@ path.leaflet-interactive:focus {
     cursor: pointer;
     z-index: 50;
   }
-  
+
   /* Botão Hambúrguer Mobile */
   .mobile-hamburger-btn {
     display: flex !important;

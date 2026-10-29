@@ -614,7 +614,7 @@ function renderCableProps(cable) {
         const src = sourceSplice && sourceSplice.fusions && sourceSplice.fusions[cable.id] ? sourceSplice.fusions[cable.id][i] : null;
         const srcText = !src ? '' : isSplitterOutput(src)
           ? (sourceSplice.splitter ? `${splitterName(sourceSplice.splitter)} · ${splitterOutLabel(sourceSplice.splitter, src)}` : 'Splitter removido')
-          : `F${src} do ${sourceCable ? sourceCable.name : 'cabo de origem'}`;
+          : (sourceCable ? `F${src} do ${sourceCable.name}` : `F${src} — ⚠️ a ${sourceSplice.name} está sem cabo de entrada`);
         const info = getRamalInfo(mappedRamalId);
         fiberControl = `
             <div style="width:100%; font-size:11px; padding:4px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:${info ? 'var(--text)' : 'var(--text3)'};">
@@ -693,6 +693,7 @@ function renderSpliceProps(splice) {
             return near.map(c => `<option value="${c.id}" ${c.id === splice.cableId ? 'selected' : ''}>${c.name} — ${countActiveFibersAt(c, pos)} fibra(s) ativa(s)</option>`).join('');
           })()}
         </select>
+        ${sourceCable ? '' : '<div style="font-size:10px; color:var(--red); margin-top:4px;">⚠️ Nenhum cabo chega nesta CEO. Arraste a CEO para cima do cabo que leva o sinal ou termine um cabo nela.</div>'}
         <div style="font-size:9px; color:var(--text3); margin-top:2px;">Cabos que passam ou chegam nesta caixa. Trocar desfaz as fusões desta CEO.</div>
       </div>
 
