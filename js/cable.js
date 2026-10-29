@@ -149,6 +149,23 @@ function finishCable() {
     fiberMapping: {}     // { "1": "ramalId" }
   };
 
+  // Ponta do cabo chegando numa CEO: encosta nela e, se a CEO ainda não usa outro cabo com
+  // sinal, este passa a ser o cabo de entrada dela (o sinal continua de CEO em CEO)
+  let endMsg = '';
+  const end = obj.path[obj.path.length - 1];
+  const endSplice = STATE.splices.find(s => s.id !== obj.sourceId && map.distance(end, [s.lat, s.lng]) <= 20);
+  if (endSplice) {
+    obj.path[obj.path.length - 1] = [endSplice.lat, endSplice.lng];
+    const current = STATE.cables.find(c => c.id === endSplice.cableId);
+    const inUse = Object.values(endSplice.fusions || {}).some(f => Object.keys(f).length) || (endSplice.splitter && endSplice.splitter.inputFiber);
+    if (!inUse && !(current && countActiveFibersAt(current, [endSplice.lat, endSplice.lng]))) {
+      endSplice.cableId = obj.id;
+      endMsg = ` Ligado como entrada da ${endSplice.name}.`;
+    } else {
+      endMsg = ` Chegou na ${endSplice.name}: escolha-o em "Cabo de entrada" no painel dela.`;
+    }
+  }
+
   STATE.cables.push(obj);
   clearCableDraw();
 
@@ -156,7 +173,7 @@ function finishCable() {
   renderCableOnMap(obj);
 
   // Cabo tronco novo: ramais da OLT que ainda não saíam em nenhuma fibra são ligados nele
-  let msg = '✅ Cabo criado com sucesso!';
+  let msg = '✅ Cabo criado com sucesso!' + endMsg;
   if (obj.sourceType === 'pop') {
     const n = autoConnectRamais(obj.sourceId, null, [obj]);
     if (n) msg += ` ${n} ramal(is) sem fibra ligado(s) nele.`;
@@ -435,9 +452,56 @@ function isSplitterOutput(src) {
 }
 
 /**
+ * Splitter desbalanceado na CEO (ex.: 10/90): S1 = derivação (menor %), S2 = passagem (maior %).
+ * Se a passagem não for fusionada em outro cabo, ela segue na mesma fibra do cabo de entrada,
+ * e a fibra continua ativa para as próximas CEOs.
+ */
+function isUnbalancedSplitter(splitter) {
+  return !!(splitter && splitter.ratio);
+}
+
+/** A fibra de entrada do splitter é cortada na CEO? (no desbalanceado só se a passagem sair por outro cabo) */
+function splitterCutsInput(sp) {
+  if (!isUnbalancedSplitter(sp.splitter)) return true;
+  return Object.values(sp.fusions || {}).some(fus => Object.values(fus).includes('S2'));
+}
+
+function splitterName(splitter) {
+  return isUnbalancedSplitter(splitter) ? `Splitter ${splitter.ratio} desbalanceado` : `Splitter 1:${splitter.outputs}`;
+}
+
+function splitterOutLabel(splitter, src) {
+  const k = parseInt(String(src).slice(1));
+  if (isUnbalancedSplitter(splitter)) {
+    const [drop, pass] = splitter.ratio.split('/');
+    return k === 1 ? `OUT ${drop}% (derivação)` : `OUT ${pass}% (passagem)`;
+  }
+  return `OUT ${k}`;
+}
+
+/** Cabos que passam ou terminam na CEO (até 20 m), candidatos a cabo de entrada */
+function getCablesAtSplice(splice) {
+  return STATE.cables
+    .filter(c => !(c.sourceType === 'splice' && c.sourceId === splice.id))
+    .map(c => {
+      const snap = findClosestOnPath([splice.lat, splice.lng], c.path);
+      return snap ? { cable: c, meters: map.distance([splice.lat, splice.lng], snap.latlng) } : null;
+    })
+    .filter(x => x && x.meters <= 20)
+    .sort((a, b) => a.meters - b.meters);
+}
+
+/** Quantas fibras do cabo chegam com sinal da OLT no ponto da CEO */
+function countActiveFibersAt(cable, latlng) {
+  let n = 0;
+  for (let f = 1; f <= cable.fibers; f++) if (getFiberSignalAt(cable, f, latlng)) n++;
+  return n;
+}
+
+/**
  * CEOs ao longo do cabo, com a distância (m) desde a origem e as fibras do cabo cortadas
  * em cada uma: fusionadas para um cabo derivado (sangria) ou ligadas na entrada do splitter.
- * A CTO não corta a fibra (no desbalanceado o sinal passa por ela).
+ * Não cortam a fibra: a CTO e o splitter desbalanceado com a passagem seguindo no cabo.
  */
 function getSpliceUsesAlong(cable) {
   return STATE.splices.filter(s => s.cableId === cable.id).map(sp => {
@@ -445,8 +509,12 @@ function getSpliceUsesAlong(cable) {
     Object.values(sp.fusions || {}).forEach(fus => Object.values(fus).forEach(src => {
       if (!isSplitterOutput(src)) fibers.add(parseInt(src));
     }));
-    if (sp.splitter && sp.splitter.inputFiber) fibers.add(parseInt(sp.splitter.inputFiber));
-    return { splice: sp, dist: getDistanceAlongCable([sp.lat, sp.lng], cable.path), fibers };
+    // Fibra que entra num splitter desbalanceado e segue pela passagem: usada aqui, mas não cortada
+    const taps = new Set();
+    if (sp.splitter && sp.splitter.inputFiber) {
+      (splitterCutsInput(sp) ? fibers : taps).add(parseInt(sp.splitter.inputFiber));
+    }
+    return { splice: sp, dist: getDistanceAlongCable([sp.lat, sp.lng], cable.path), fibers, taps };
   });
 }
 
@@ -511,7 +579,8 @@ function recomputeSignals() {
 
     const cuts = getFiberCuts(cable);
     STATE.splices.filter(s => s.cableId === cable.id).forEach(sp => {
-      const spliceDist = offsets[cable.id] + getDistanceAlongCable([sp.lat, sp.lng], cable.path);
+      const alongDist = getDistanceAlongCable([sp.lat, sp.lng], cable.path);
+      const spliceDist = offsets[cable.id] + alongDist;
       STATE.cables.filter(c => c.sourceType === 'splice' && c.sourceId === sp.id).forEach(child => {
         if (offsets[child.id] === undefined) offsets[child.id] = spliceDist;
         Object.entries((sp.fusions || {})[child.id] || {}).forEach(([childFiber, src]) => {
@@ -519,7 +588,7 @@ function recomputeSignals() {
           if (!parentFiber) return;
           // Se a fibra já foi cortada numa CEO anterior, o sinal não chega nesta
           const cut = cuts[parentFiber];
-          if (cut && cut.splice.id !== sp.id) return;
+          if (cut && cut.splice.id !== sp.id && cut.dist < alongDist) return;
           const ramalId = cable.fiberMapping[parentFiber];
           if (ramalId) child.fiberMapping[childFiber] = ramalId;
         });

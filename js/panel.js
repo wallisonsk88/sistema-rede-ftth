@@ -613,7 +613,7 @@ function renderCableProps(cable) {
       } else {
         const src = sourceSplice && sourceSplice.fusions && sourceSplice.fusions[cable.id] ? sourceSplice.fusions[cable.id][i] : null;
         const srcText = !src ? '' : isSplitterOutput(src)
-          ? `Splitter 1:${sourceSplice.splitter ? sourceSplice.splitter.outputs : '?'} · ${src.replace('S', 'OUT ')}`
+          ? (sourceSplice.splitter ? `${splitterName(sourceSplice.splitter)} · ${splitterOutLabel(sourceSplice.splitter, src)}` : 'Splitter removido')
           : `F${src} do ${sourceCable ? sourceCable.name : 'cabo de origem'}`;
         const info = getRamalInfo(mappedRamalId);
         fiberControl = `
@@ -682,18 +682,36 @@ function renderSpliceProps(splice) {
           onchange="updateSpliceField('${splice.id}','obs',this.value)">${splice.obs || ''}</textarea>
       </div>
 
+      <!-- CABO DE ENTRADA: de onde vem o sinal da OLT para esta CEO -->
+      <div class="fp-group" style="background:var(--bg3); padding:10px; border-radius:6px; border:1px solid var(--border);">
+        <label class="fp-label" style="color:var(--primary); font-weight:bold;">🔌 Cabo de entrada (sinal que chega da OLT)</label>
+        <select class="fp-input" onchange="setSpliceInputCable('${splice.id}', this.value)">
+          ${(() => {
+            const pos = [splice.lat, splice.lng];
+            const near = getCablesAtSplice(splice).map(x => x.cable);
+            if (sourceCable && !near.includes(sourceCable)) near.unshift(sourceCable);
+            return near.map(c => `<option value="${c.id}" ${c.id === splice.cableId ? 'selected' : ''}>${c.name} — ${countActiveFibersAt(c, pos)} fibra(s) ativa(s)</option>`).join('');
+          })()}
+        </select>
+        <div style="font-size:9px; color:var(--text3); margin-top:2px;">Cabos que passam ou chegam nesta caixa. Trocar desfaz as fusões desta CEO.</div>
+      </div>
+
       <!-- PAINEL DO SPLITTER FÍSICO NA CEO -->
       <div class="fp-group" style="background:var(--bg3); padding:10px; border-radius:6px; border:1px solid var(--border);">
         <div style="font-size:12px; font-weight:bold; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-          <span>🎛️ Splitter Balanceado</span>
+          <span>🎛️ Splitter</span>
         </div>
-        <label class="fp-label" style="font-size:10px;">Instalar Splitter (Desconecta fusões caso o tamanho mude)</label>
+        <label class="fp-label" style="font-size:10px;">Instalar Splitter (trocar desconecta as saídas do splitter)</label>
         <select class="fp-input" onchange="installSplitterInSplice('${splice.id}', this.value)">
           <option value="" ${!splice.splitter ? 'selected' : ''}>Nenhum Splitter Instalado</option>
-          <option value="4" ${splice.splitter && splice.splitter.outputs === 4 ? 'selected' : ''}>Splitter 1:4</option>
-          <option value="8" ${splice.splitter && splice.splitter.outputs === 8 ? 'selected' : ''}>Splitter 1:8</option>
-          <option value="16" ${splice.splitter && splice.splitter.outputs === 16 ? 'selected' : ''}>Splitter 1:16</option>
+          <optgroup label="Balanceado (corta a fibra)">
+            ${[2, 4, 8, 16, 32].map(n => `<option value="${n}" ${splice.splitter && !splice.splitter.ratio && splice.splitter.outputs === n ? 'selected' : ''}>Splitter 1:${n}</option>`).join('')}
+          </optgroup>
+          <optgroup label="Desbalanceado (a passagem segue no cabo)">
+            ${Object.keys(SPLITTER_UNBAL).map(r => `<option value="U:${r}" ${splice.splitter && splice.splitter.ratio === r ? 'selected' : ''}>Splitter ${r}</option>`).join('')}
+          </optgroup>
         </select>
+        ${isUnbalancedSplitter(splice.splitter) ? `<div style="font-size:9px; color:var(--text3); margin-top:4px;">Fusione a ${splitterOutLabel(splice.splitter, 'S1')} no cabo derivado. A ${splitterOutLabel(splice.splitter, 'S2')} segue na mesma fibra até a próxima CEO, a não ser que você a fusione em outro cabo.</div>` : ''}
       </div>
 
       ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(splice.id) : ''}
@@ -732,8 +750,9 @@ function renderSpliceProps(splice) {
         derivedCables.forEach(dc => Object.entries(splice.fusions[dc.id] || {}).forEach(([childFiber, src]) => {
           if (String(src) === String(j)) sangrias.push(`${dc.name} F${childFiber}`);
         }));
-        const next = alongUses.filter(u => u.dist > here.dist && u.fibers.has(j)).sort((a, b) => a.dist - b.dist)[0];
-        const action = splice.splitter && splice.splitter.inputFiber == j ? `🎛️ Entra no splitter 1:${splice.splitter.outputs}`
+        const next = alongUses.filter(u => u.dist > here.dist && (u.fibers.has(j) || u.taps.has(j))).sort((a, b) => a.dist - b.dist)[0];
+        const action = splice.splitter && splice.splitter.inputFiber == j
+          ? `🎛️ Entra no ${splitterName(splice.splitter)}${splitterCutsInput(splice) ? '' : ` — a passagem segue no cabo${next ? ` até a ${next.splice.name}` : ''}`}`
           : sangrias.length ? `✂️ Sangria ➡️ ${sangrias.join(', ')}`
           : `➡️ Passa direto${next ? ` (usada na ${next.splice.name})` : ''}`;
         detail = `<div style="font-size:10px; font-weight:600; color:var(--green);">🟢 ${info.label}</div>
@@ -871,7 +890,7 @@ function renderSpliceProps(splice) {
           <div style="flex:1.2; display:flex; flex-direction:column; align-items:center; border-right:1px dashed var(--border); padding:0 5px;">
             <div style="font-size:10px; font-weight:bold; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:4px;">
               <div style="width:0; height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; border-left:8px solid var(--primary);"></div>
-              Splitter 1:${splice.splitter.outputs}
+              ${splitterName(splice.splitter)}
             </div>
 
             <!-- Entrada do Splitter -->
@@ -907,21 +926,21 @@ function renderSpliceProps(splice) {
                html += `
                  <div style="padding:4px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); background:rgba(0,0,0,0.2); display:flex; align-items:center; gap:4px; opacity:0.5;">
                    <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                   <span style="font-size:8px; color:var(--text2)">OUT ${j} (${outColor.name})</span>
+                   <span style="font-size:8px; color:var(--text2)">${splitterOutLabel(splice.splitter, sId)}</span>
                  </div>
                `;
             } else if (!splice.splitter.inputFiber) {
                html += `
                  <div style="padding:4px; border-radius:4px; border:1px solid var(--border); background:var(--surface2); display:flex; align-items:center; gap:4px; opacity:0.3;" title="Alimente o splitter primeiro!">
                    <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                   <span style="font-size:8px; color:var(--text2)">OUT ${j} (${outColor.name})</span>
+                   <span style="font-size:8px; color:var(--text2)">${splitterOutLabel(splice.splitter, sId)}</span>
                  </div>
                `;
             } else {
                html += `
                  <div draggable="true" ondragstart="dragFiber(event, '${sId}')" style="padding:4px; border-radius:4px; border:1px solid ${outColor.hex}; background:rgba(59, 130, 246, 0.05); display:flex; align-items:center; gap:4px; cursor:grab; box-shadow:0 1px 2px rgba(0,0,0,0.2);" title="${outColor.name}">
                    <div style="width:8px; height:8px; border-radius:50%; background:${outColor.hex}; border:1px solid rgba(255,255,255,0.2);"></div>
-                   <span style="font-size:8px; font-weight:bold; color:var(--text1)">OUT ${j}</span>
+                   <span style="font-size:8px; font-weight:bold; color:var(--text1)">${splitterOutLabel(splice.splitter, sId)}</span>
                  </div>
                `;
             }
@@ -1015,31 +1034,58 @@ window.removeFusion = function(spliceId, destCableId, destFiberIndex) {
 }
 
 // Manipulação do Splitter Físico
-window.installSplitterInSplice = function(spliceId, outputs) {
+window.installSplitterInSplice = function(spliceId, value) {
   const splice = STATE.splices.find(s => s.id === spliceId);
   if (!splice) return;
 
-  if (!outputs) {
-    // Remove o splitter e limpa as fusões que eram dele (tudo que começa com 'S')
+  // Trocar ou remover o splitter desconecta as fusões que saíam dele (S1, S2...)
+  Object.values(splice.fusions || {}).forEach(fus => {
+    Object.keys(fus).forEach(f => { if (isSplitterOutput(fus[f])) delete fus[f]; });
+  });
+  const inputFiber = splice.splitter ? splice.splitter.inputFiber : null;
+
+  if (!value) {
     delete splice.splitter;
-    if (splice.fusions) {
-      Object.keys(splice.fusions).forEach(cableId => {
-        Object.keys(splice.fusions[cableId]).forEach(fiberIndex => {
-          if (typeof splice.fusions[cableId][fiberIndex] === 'string' && splice.fusions[cableId][fiberIndex].startsWith('S')) {
-            window.removeFusion(spliceId, cableId, fiberIndex); // Remove a herança também
-          }
-        });
-      });
-    }
+  } else if (String(value).startsWith('U:')) {
+    splice.splitter = { outputs: 2, ratio: value.slice(2), inputFiber };
   } else {
-    // Instala um splitter novo
-    splice.splitter = {
-      outputs: parseInt(outputs),
-      inputFiber: null
-    };
+    splice.splitter = { outputs: parseInt(value), inputFiber };
   }
   saveLocal();
   renderPanel();
+}
+
+/** Troca o cabo de entrada da CEO (cabo que passa ou chega nela); desfaz as fusões porque as fibras mudam */
+window.setSpliceInputCable = function(spliceId, cableId) {
+  const splice = STATE.splices.find(s => s.id === spliceId);
+  const cable = STATE.cables.find(c => c.id === cableId);
+  if (!splice || !cable || splice.cableId === cableId) return;
+
+  const hasFusions = Object.values(splice.fusions || {}).some(f => Object.keys(f).length) || (splice.splitter && splice.splitter.inputFiber);
+  if (hasFusions && !confirm(`Trocar o cabo de entrada da ${splice.name} desfaz as fusões dela. Continuar?`)) {
+    renderPanel();
+    return;
+  }
+  splice.cableId = cableId;
+  splice.fusions = {};
+  if (splice.splitter) splice.splitter.inputFiber = null;
+
+  // Encosta a CEO no traçado do novo cabo de entrada (e a ponta dos cabos que saem dela)
+  const snap = snapToCable(splice.lat, splice.lng, cable.path);
+  if (snap) {
+    splice.lat = snap.latlng.lat;
+    splice.lng = snap.latlng.lng;
+    STATE.cables.forEach(c => {
+      if (c.sourceType === 'splice' && c.sourceId === splice.id) {
+        c.path[0] = [splice.lat, splice.lng];
+        if (c.layer) c.layer.setLatLngs(c.path);
+      }
+    });
+  }
+  saveLocal();
+  renderAllSplices();
+  renderPanel();
+  toast(`🔌 ${splice.name} agora recebe o sinal do ${cable.name}`);
 }
 
 window.dropFiberToSplitter = function(ev, spliceId) {
