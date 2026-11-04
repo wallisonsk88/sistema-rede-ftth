@@ -76,6 +76,8 @@ function serializeState() {
       ponPorts: o.ponPorts,
       pons: o.pons,
       oltEquipments: o.oltEquipments,
+      rackItems: o.rackItems || [],
+      rackOrder: o.rackOrder || [],
       obs: o.obs,
     })),
     cables: STATE.cables.map(c => ({

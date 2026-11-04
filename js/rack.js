@@ -4,15 +4,56 @@
  * O rack mostra só o que existe no projeto:
  *   - OLT: cada OLT cadastrada no POP (portas PON em gaiolas SFP, 16 por U)
  *   - DIO: cada cabo tronco que sai do POP (adaptadores SC/APC, 24 por U)
+ *   - Equipamentos que o usuário adicionar do catálogo (switch, MikroTik, borda,
+ *     CGNAT, nobreak...), guardados em pop.rackItems
  *   - Cordões de manobra: da porta PON até a fibra do DIO em que o ramal está ligado
- * Clicar numa peça abre a edição dela ao lado do rack.
+ * A ordem das peças fica em pop.rackOrder. Clicar numa peça abre a edição dela ao lado.
  */
 
-// Peça selecionada no rack: { popId, type: 'pop' | 'olt' | 'pon' | 'dio' | 'fiber', oltId, ponIndex, cableId, fiber }
+// Peça selecionada no rack: { popId, type: 'pop' | 'olt' | 'pon' | 'dio' | 'fiber' | 'eq' | 'catalog', oltId, ponIndex, cableId, fiber, eqId }
 window.rackSel = window.rackSel || null;
 
 const PONS_PER_ROW = 8;
 const DIO_PER_ROW = 12;
+
+/**
+ * Equipamentos que um provedor costuma ter no POP. `face` escolhe o desenho da frente;
+ * u/rj45/sfp são os padrões ao adicionar (o usuário ajusta depois).
+ */
+const EQUIPMENT_CATALOG = [
+  { type: 'borda',     label: 'Roteador de Borda (BGP)',   icon: '🌐', face: 'router',   u: 1, rj45: 4,  sfp: 8, desc: 'Saída para a operadora / trânsito IP e BGP' },
+  { type: 'bng',       label: 'Concentrador PPPoE / BNG',  icon: '🔐', face: 'router',   u: 1, rj45: 4,  sfp: 4, desc: 'Autentica e entrega IP aos clientes' },
+  { type: 'cgnat',     label: 'CGNAT',                     icon: '🔁', face: 'server',   u: 1, rj45: 4,  sfp: 4, desc: 'Compartilha IP público entre clientes' },
+  { type: 'mikrotik',  label: 'Roteador MikroTik',         icon: '🧭', face: 'mikrotik', u: 1, rj45: 8,  sfp: 4, desc: 'CCR / RB: roteamento, PPPoE, firewall' },
+  { type: 'switch',    label: 'Switch',                    icon: '🔀', face: 'switch',   u: 1, rj45: 24, sfp: 4, desc: 'Agregação e distribuição da rede' },
+  { type: 'firewall',  label: 'Firewall',                  icon: '🛡️', face: 'firewall', u: 1, rj45: 8,  sfp: 2, desc: 'Segurança da rede' },
+  { type: 'servidor',  label: 'Servidor',                  icon: '🗄️', face: 'server',   u: 2, rj45: 2,  sfp: 0, desc: 'DNS, Radius, sistema de gestão, monitoramento' },
+  { type: 'cache',     label: 'Cache CDN (GGC / OCA)',     icon: '⚡', face: 'server',   u: 2, rj45: 0,  sfp: 4, desc: 'Cache Google, Netflix, Meta' },
+  { type: 'patch',     label: 'Patch Panel',               icon: '🔌', face: 'patch',    u: 1, rj45: 24, sfp: 0, desc: 'Organização dos cabos de rede (RJ45)' },
+  { type: 'organizador', label: 'Organizador de Cabos',    icon: '〰️', face: 'brush',    u: 1, rj45: 0,  sfp: 0, desc: 'Guia horizontal para os cordões' },
+  { type: 'nobreak',   label: 'Nobreak / UPS',             icon: '🔋', face: 'ups',      u: 2, rj45: 0,  sfp: 0, desc: 'Energia de reserva (bateria)' },
+  { type: 'retificadora', label: 'Retificadora / Fonte -48V', icon: '⚙️', face: 'ups',   u: 2, rj45: 0,  sfp: 0, desc: 'Alimentação DC dos equipamentos' },
+  { type: 'pdu',       label: 'Régua de Tomadas (PDU)',    icon: '🔌', face: 'pdu',      u: 1, rj45: 0,  sfp: 0, desc: 'Distribuição de energia no rack' },
+  { type: 'ventilacao', label: 'Ventilação',               icon: '🌀', face: 'fans',     u: 1, rj45: 0,  sfp: 0, desc: 'Exaustores / ventiladores do rack' },
+  { type: 'bandeja',   label: 'Bandeja / Prateleira',      icon: '🧰', face: 'shelf',    u: 1, rj45: 0,  sfp: 0, desc: 'Apoio para ONU, modem, conversor de mídia' },
+];
+const PORT_FACES = ['router', 'server', 'mikrotik', 'switch', 'firewall', 'patch'];
+
+function catalogEntry(type) {
+  return EQUIPMENT_CATALOG.find(c => c.type === type) || { type, label: 'Equipamento', icon: '📦', face: 'shelf', u: 1, rj45: 0, sfp: 0 };
+}
+
+/** Peças do rack na ordem salva (pop.rackOrder); peças novas entram no fim */
+function getRackEntries(pop) {
+  const entries = [
+    ...getOltPorts(pop).map(o => ({ key: 'olt:' + o.olt.id, kind: 'olt', olt: o.olt, ports: o.ports })),
+    ...(pop.rackItems || []).map(item => ({ key: 'eq:' + item.id, kind: 'eq', item })),
+    ...getPopRootCables(pop.id).map(cable => ({ key: 'dio:' + cable.id, kind: 'dio', cable })),
+  ];
+  const order = pop.rackOrder || [];
+  const rank = (e, i) => { const k = order.indexOf(e.key); return k >= 0 ? k : 1000 + i; };
+  return entries.map((e, i) => ({ e, r: rank(e, i) })).sort((a, b) => a.r - b.r).map(x => x.e);
+}
 
 function rackSelect(sel) {
   window.rackSel = sel;
@@ -25,6 +66,7 @@ function getRackSel(pop) {
   // Peça que deixou de existir (OLT removida, cabo apagado) volta para o POP
   if (sel.oltId && !pop.oltEquipments.some(o => o.id === sel.oltId)) return { popId: pop.id, type: 'pop' };
   if (sel.cableId && !STATE.cables.some(c => c.id === sel.cableId)) return { popId: pop.id, type: 'pop' };
+  if (sel.eqId && !(pop.rackItems || []).some(i => i.id === sel.eqId)) return { popId: pop.id, type: 'pop' };
   return sel;
 }
 
@@ -66,89 +108,95 @@ function renderPOPProps(pop) {
 
 function renderRack(pop, sel) {
   const isSel = (type, extra) => sel.type === type && Object.keys(extra).every(k => sel[k] === extra[k]);
+  const screws = '<span class="screw tl"></span><span class="screw bl"></span><span class="screw tr"></span><span class="screw br"></span>';
   let units = '';
   let u = 1;
   const uLabels = [];
   const addU = n => { for (let k = 0; k < n; k++) uLabels.push(u++); };
 
-  // ---- OLTs ----
-  getOltPorts(pop).forEach(({ olt, ports }) => {
-    const rows = Math.ceil(ports.length / PONS_PER_ROW);
-    const uSize = Math.max(1, Math.ceil(rows / 2));
-    addU(uSize);
-    const portsHtml = ports.map(p => {
-      let state = 'off';
-      let title = `${olt.name} · PON ${String(p.local).padStart(2, '0')} — livre (clique para configurar uma rota)`;
-      let color = '';
-      if (p.pon) {
-        const conn = connectedRamais(pop, p.pon).length;
-        state = conn ? 'on' : 'warn';
-        color = p.pon.color;
-        title = `${olt.name} · PON ${String(p.local).padStart(2, '0')} · ${p.pon.rotaName} — ${(p.pon.ramais || []).length} ramal(is), ${conn} ligado(s) no DIO`;
+  getRackEntries(pop).forEach(entry => {
+    if (entry.kind === 'olt') {
+      const { olt, ports } = entry;
+      const rows = Math.ceil(ports.length / PONS_PER_ROW);
+      const uSize = Math.max(1, Math.ceil(rows / 2));
+      addU(uSize);
+      const portsHtml = ports.map(p => {
+        let state = 'off';
+        let title = `${olt.name} · PON ${String(p.local).padStart(2, '0')} — livre (clique para configurar uma rota)`;
+        let color = '';
+        if (p.pon) {
+          const conn = connectedRamais(pop, p.pon).length;
+          state = conn ? 'on' : 'warn';
+          color = p.pon.color;
+          title = `${olt.name} · PON ${String(p.local).padStart(2, '0')} · ${p.pon.rotaName} — ${(p.pon.ramais || []).length} ramal(is), ${conn} ligado(s) no DIO`;
+        }
+        const selected = isSel('pon', { ponIndex: p.index }) ? ' selected' : '';
+        return `
+          <button class="sfp ${state}${selected}" data-pon="${p.index}" title="${title}"
+            onclick="rackSelect({ popId: '${pop.id}', type: 'pon', oltId: '${olt.id}', ponIndex: ${p.index} })"
+            onmouseenter="rackHover('pon-${p.index}', true)" onmouseleave="rackHover('pon-${p.index}', false)">
+            <span class="sfp-led" style="${color ? `--led:${color}` : ''}"></span>
+            <span class="sfp-num">${p.local}</span>
+          </button>`;
+      }).join('');
+
+      units += `
+        <div class="rack-unit olt-unit${isSel('olt', { oltId: olt.id }) ? ' selected' : ''}" style="--u:${uSize}">
+          ${screws}
+          <div class="olt-plate" onclick="rackSelect({ popId: '${pop.id}', type: 'olt', oltId: '${olt.id}' })" title="Configurar ${olt.name}">
+            <div class="olt-name">${olt.name}</div>
+            <div class="olt-model">GPON OLT · ${ports.length} PON</div>
+            <div class="olt-leds"><span class="led pwr" title="PWR"></span><span class="led sys" title="SYS"></span><span class="led alm" title="ALM"></span></div>
+          </div>
+          <div class="olt-ports" style="--cols:${Math.min(PONS_PER_ROW, ports.length)}">${portsHtml}</div>
+          <div class="olt-uplink" title="Uplink / gerência">
+            <span class="rj45"></span><span class="rj45"></span><span class="rj45"></span><span class="rj45"></span>
+            <span class="console">CON</span>
+          </div>
+        </div>`;
+    } else if (entry.kind === 'dio') {
+      const { cable } = entry;
+      const uSize = Math.max(1, Math.ceil(cable.fibers / (DIO_PER_ROW * 2)));
+      addU(uSize);
+      let adapters = '';
+      for (let f = 1; f <= cable.fibers; f++) {
+        const fColor = FIBER_COLORS[(f - 1) % FIBER_COLORS.length];
+        const info = getRamalInfo(cable.fiberMapping[f]);
+        const selected = isSel('fiber', { cableId: cable.id, fiber: f }) ? ' selected' : '';
+        const title = `${fiberLabel(f, cable.fibers)} — ${info ? info.label : 'livre'}`;
+        adapters += `
+          <button class="dio-port ${info ? 'on' : 'off'}${selected}" data-fiber="${cable.id}:${f}" title="${title}"
+            onclick="rackSelect({ popId: '${pop.id}', type: 'fiber', cableId: '${cable.id}', fiber: ${f} })"
+            ondragover="rackDragOver(event)" ondragleave="this.classList.remove('drop-ok')" ondrop="rackDropRamal(event, '${cable.id}', ${f})"
+            onmouseenter="${info ? `rackHover('pon-${info.pon.index}', true)` : ''}" onmouseleave="${info ? `rackHover('pon-${info.pon.index}', false)` : ''}">
+            <span class="dio-ring" style="background:${fColor.hex}"></span>
+            <span class="dio-num">${f}</span>
+          </button>`;
       }
-      const selected = isSel('pon', { ponIndex: p.index }) ? ' selected' : '';
-      return `
-        <button class="sfp ${state}${selected}" data-pon="${p.index}" title="${title}"
-          onclick="rackSelect({ popId: '${pop.id}', type: 'pon', oltId: '${olt.id}', ponIndex: ${p.index} })"
-          onmouseenter="rackHover('pon-${p.index}', true)" onmouseleave="rackHover('pon-${p.index}', false)">
-          <span class="sfp-led" style="${color ? `--led:${color}` : ''}"></span>
-          <span class="sfp-num">${p.local}</span>
-        </button>`;
-    }).join('');
-
-    units += `
-      <div class="rack-unit olt-unit${isSel('olt', { oltId: olt.id }) ? ' selected' : ''}" style="--u:${uSize}">
-        <span class="screw tl"></span><span class="screw bl"></span><span class="screw tr"></span><span class="screw br"></span>
-        <div class="olt-plate" onclick="rackSelect({ popId: '${pop.id}', type: 'olt', oltId: '${olt.id}' })" title="Configurar ${olt.name}">
-          <div class="olt-name">${olt.name}</div>
-          <div class="olt-model">GPON OLT · ${ports.length} PON</div>
-          <div class="olt-leds"><span class="led pwr" title="PWR"></span><span class="led sys" title="SYS"></span><span class="led alm" title="ALM"></span></div>
-        </div>
-        <div class="olt-ports" style="--cols:${Math.min(PONS_PER_ROW, ports.length)}">${portsHtml}</div>
-        <div class="olt-uplink" title="Uplink / gerência">
-          <span class="rj45"></span><span class="rj45"></span><span class="rj45"></span><span class="rj45"></span>
-          <span class="console">CON</span>
-        </div>
-      </div>`;
-  });
-
-  // ---- DIOs (um por cabo tronco) ----
-  getPopRootCables(pop.id).forEach(cable => {
-    const uSize = Math.max(1, Math.ceil(cable.fibers / (DIO_PER_ROW * 2)));
-    addU(uSize);
-    let adapters = '';
-    for (let f = 1; f <= cable.fibers; f++) {
-      const fColor = FIBER_COLORS[(f - 1) % FIBER_COLORS.length];
-      const info = getRamalInfo(cable.fiberMapping[f]);
-      const selected = isSel('fiber', { cableId: cable.id, fiber: f }) ? ' selected' : '';
-      const title = `${fiberLabel(f, cable.fibers)} — ${info ? info.label : 'livre'}`;
-      adapters += `
-        <button class="dio-port ${info ? 'on' : 'off'}${selected}" data-fiber="${cable.id}:${f}" title="${title}"
-          onclick="rackSelect({ popId: '${pop.id}', type: 'fiber', cableId: '${cable.id}', fiber: ${f} })"
-          ondragover="rackDragOver(event)" ondragleave="this.classList.remove('drop-ok')" ondrop="rackDropRamal(event, '${cable.id}', ${f})"
-          onmouseenter="${info ? `rackHover('pon-${info.pon.index}', true)` : ''}" onmouseleave="${info ? `rackHover('pon-${info.pon.index}', false)` : ''}">
-          <span class="dio-ring" style="background:${fColor.hex}"></span>
-          <span class="dio-num">${f}</span>
-        </button>`;
+      const used = Object.keys(cable.fiberMapping || {}).filter(f => getRamalInfo(cable.fiberMapping[f])).length;
+      units += `
+        <div class="rack-unit dio-unit${isSel('dio', { cableId: cable.id }) ? ' selected' : ''}" style="--u:${uSize}">
+          ${screws}
+          <div class="dio-plate" onclick="rackSelect({ popId: '${pop.id}', type: 'dio', cableId: '${cable.id}' })" title="Configurar DIO do ${cable.name}">
+            <div class="dio-title">DIO</div>
+            <div class="dio-cable">${cable.name}</div>
+            <div class="dio-count">${used}/${cable.fibers} FO</div>
+          </div>
+          <div class="dio-ports" style="--cols:${Math.min(DIO_PER_ROW, cable.fibers)}">${adapters}</div>
+        </div>`;
+    } else {
+      const { item } = entry;
+      const uSize = Math.max(1, parseInt(item.u) || 1);
+      addU(uSize);
+      units += renderEquipUnit(pop, item, uSize, isSel('eq', { eqId: item.id }), screws);
     }
-    const used = Object.keys(cable.fiberMapping || {}).filter(f => getRamalInfo(cable.fiberMapping[f])).length;
-    units += `
-      <div class="rack-unit dio-unit${isSel('dio', { cableId: cable.id }) ? ' selected' : ''}" style="--u:${uSize}">
-        <span class="screw tl"></span><span class="screw bl"></span><span class="screw tr"></span><span class="screw br"></span>
-        <div class="dio-plate" onclick="rackSelect({ popId: '${pop.id}', type: 'dio', cableId: '${cable.id}' })" title="Configurar DIO do ${cable.name}">
-          <div class="dio-title">DIO</div>
-          <div class="dio-cable">${cable.name}</div>
-          <div class="dio-count">${used}/${cable.fibers} FO</div>
-        </div>
-        <div class="dio-ports" style="--cols:${Math.min(DIO_PER_ROW, cable.fibers)}">${adapters}</div>
-      </div>`;
   });
 
   // ---- Espaço livre ----
   addU(1);
   units += `
-    <button class="rack-unit rack-empty" onclick="rackAddOlt('${pop.id}')" title="Adicionar uma OLT neste POP">
-      ＋ Adicionar OLT
+    <button class="rack-unit rack-empty${sel.type === 'catalog' ? ' selected' : ''}" onclick="rackSelect({ popId: '${pop.id}', type: 'catalog' })" title="Adicionar um equipamento neste rack">
+      ＋ Adicionar equipamento
     </button>`;
 
   const rails = uLabels.map(n => `<span style="--u:1">${n}</span>`).join('');
@@ -157,6 +205,7 @@ function renderRack(pop, sel) {
       <div class="rack-top${sel.type === 'pop' ? ' selected' : ''}" onclick="rackSelect({ popId: '${pop.id}', type: 'pop' })" title="Dados do POP">
         <img src="img/logo.png" alt="MEGA FTTX">
         <span class="rack-pop-name">${pop.name}</span>
+        <button class="rack-full-btn" onclick="event.stopPropagation(); rackToggleFull()" title="${window.rackFull ? 'Voltar ao tamanho normal' : 'Ver o rack em tela cheia'}">${window.rackFull ? '🗗' : '⛶'}</button>
         <span class="rack-status-led"></span>
       </div>
       <div class="rack-body">
@@ -174,6 +223,52 @@ function renderRack(pop, sel) {
     </div>`;
 }
 
+/** Frente do equipamento conforme o tipo (desenho ilustrativo; as portas não têm ligação no projeto) */
+function renderEquipUnit(pop, item, uSize, selected, screws) {
+  const cat = catalogEntry(item.type);
+  const face = cat.face;
+  const rows = uSize * 2;
+  const portGrid = (n, cls, label) => {
+    if (!n) return '';
+    const cols = Math.ceil(n / rows);
+    let html = '';
+    for (let k = 1; k <= n; k++) html += `<span class="${cls}" title="${label} ${k}"><i></i></span>`;
+    return `<div class="eq-ports" style="--cols:${cols}">${html}</div>`;
+  };
+
+  let body = '';
+  if (PORT_FACES.includes(face)) {
+    const lcd = face === 'mikrotik' || face === 'server' ? `<div class="eq-lcd">${face === 'server' ? 'OK' : (item.ip || 'RouterOS')}</div>` : '';
+    const bays = face === 'server' ? `<div class="eq-bays" style="--cols:${uSize * 2}">${'<span></span>'.repeat(uSize * 4)}</div>` : '';
+    body = `${bays}${portGrid(parseInt(item.rj45) || 0, 'eq-rj45', face === 'patch' ? 'Keystone' : 'Porta RJ45')}${portGrid(parseInt(item.sfp) || 0, 'eq-sfp', 'SFP')}${lcd}`;
+  } else if (face === 'ups') {
+    body = `
+      <div class="eq-ups-lcd"><b>${item.type === 'retificadora' ? '-48V DC' : '220V · 100%'}</b><span>${'▮'.repeat(5)}</span></div>
+      <div class="eq-ups-btns"><span></span><span></span><span></span></div>
+      <div class="eq-vents"></div>`;
+  } else if (face === 'pdu') {
+    body = `<div class="eq-sockets">${'<span></span>'.repeat(8)}</div><span class="eq-power"></span>`;
+  } else if (face === 'fans') {
+    body = `<div class="eq-fans">${'<span></span>'.repeat(4)}</div>`;
+  } else if (face === 'brush') {
+    body = `<div class="eq-brush"></div>`;
+  } else {
+    body = `<div class="eq-shelf"></div>`;
+  }
+
+  return `
+    <div class="rack-unit eq-unit face-${face} eq-${item.type}${selected ? ' selected' : ''}" style="--u:${uSize}" data-eq="${item.id}"
+      onclick="rackSelect({ popId: '${pop.id}', type: 'eq', eqId: '${item.id}' })" title="${item.name}${item.model ? ' · ' + item.model : ''}">
+      ${screws}
+      <div class="eq-plate">
+        <div class="eq-name">${cat.icon} ${item.name}</div>
+        <div class="eq-model">${item.model || cat.label}</div>
+        <div class="olt-leds"><span class="led pwr"></span><span class="led sys"></span></div>
+      </div>
+      <div class="eq-body">${body}</div>
+    </div>`;
+}
+
 // ================================================================
 //  EDIÇÃO DA PEÇA SELECIONADA
 // ================================================================
@@ -184,6 +279,8 @@ function renderRackDetail(pop, sel) {
     case 'pon': return renderPonDetail(pop, sel.ponIndex);
     case 'dio': return renderDioDetail(pop, STATE.cables.find(c => c.id === sel.cableId));
     case 'fiber': return renderFiberDetail(pop, STATE.cables.find(c => c.id === sel.cableId), sel.fiber);
+    case 'eq': return renderEquipDetail(pop, (pop.rackItems || []).find(i => i.id === sel.eqId));
+    case 'catalog': return renderCatalog(pop);
     default: return renderPopDetail(pop);
   }
 }
@@ -227,7 +324,7 @@ function renderPopDetail(pop) {
     ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(pop.id) : ''}
 
     <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
-      <button class="btn-full primary" onclick="rackAddOlt('${pop.id}')">＋ Adicionar OLT</button>
+      <button class="btn-full primary" onclick="rackSelect({ popId: '${pop.id}', type: 'catalog' })">＋ Adicionar equipamento</button>
       <button class="btn-full" style="background:var(--surface2);" onclick="clearHighlight()">🧹 Limpar Rastreamento</button>
       <button class="btn-full danger" onclick="deleteElement('${pop.id}')">🗑️ Remover POP</button>
     </div>`;
@@ -286,6 +383,7 @@ function renderOltDetail(pop, olt) {
       </div>
     </div>
 
+    ${rackMoveButtons(pop, 'olt:' + olt.id)}
     <button class="btn-full danger" onclick="removeOltEquipment('${pop.id}', '${olt.id}')">🗑️ Remover OLT</button>`;
 }
 
@@ -471,6 +569,7 @@ function renderDioDetail(pop, cable) {
           <span><b>${fiberLabel(f, cable.fibers)}</b><br>${info.label}</span>
         </button>`).join('')}
     </div>
+    ${rackMoveButtons(pop, 'dio:' + cable.id)}
     <button class="btn-full primary" onclick="selectElement('${cable.id}')">🧵 Abrir propriedades do cabo</button>`;
 }
 
@@ -509,9 +608,131 @@ function renderFiberDetail(pop, cable, fiber) {
       </div>` : ''}`;
 }
 
+function rackMoveButtons(pop, key) {
+  const keys = getRackEntries(pop).map(e => e.key);
+  const i = keys.indexOf(key);
+  return `
+    <div class="rack-btn-row">
+      <button class="rack-btn" ${i <= 0 ? 'disabled' : ''} onclick="rackMove('${pop.id}', '${key}', -1)">⬆ Subir no rack</button>
+      <button class="rack-btn" ${i >= keys.length - 1 ? 'disabled' : ''} onclick="rackMove('${pop.id}', '${key}', 1)">⬇ Descer no rack</button>
+    </div>`;
+}
+
+function renderCatalog(pop) {
+  return `
+    ${detailHeader('➕', 'Adicionar equipamento', 'Escolha o que existe neste POP')}
+    <div class="eq-catalog">
+      <button class="eq-card" onclick="rackAddOlt('${pop.id}')">
+        <span class="eq-card-icon">🖥️</span><b>OLT GPON</b><span>Portas PON para as rotas</span>
+      </button>
+      ${EQUIPMENT_CATALOG.map(c => `
+        <button class="eq-card" onclick="rackAddEquipment('${pop.id}', '${c.type}')">
+          <span class="eq-card-icon">${c.icon}</span><b>${c.label}</b><span>${c.desc}</span>
+        </button>`).join('')}
+    </div>
+    <div class="rack-hint" style="margin-top:12px;">🗄️ O <b>DIO</b> aparece sozinho no rack para cada cabo tronco que sai deste POP.</div>`;
+}
+
+function renderEquipDetail(pop, item) {
+  const cat = catalogEntry(item.type);
+  const key = 'eq:' + item.id;
+  const field = (prop, label, attrs = '') => `
+    <div class="fp-group">
+      <label class="fp-label">${label}</label>
+      <input class="fp-input" value="${item[prop] !== undefined ? item[prop] : ''}" ${attrs} onchange="rackUpdateEquipment('${pop.id}', '${item.id}', '${prop}', this.value)">
+    </div>`;
+  return `
+    ${detailHeader(cat.icon, item.name, cat.label)}
+    ${field('name', 'Nome')}
+    ${field('model', 'Fabricante / Modelo', 'placeholder="Ex.: MikroTik CCR2004, Huawei NE8000"')}
+    <div class="fp-row">
+      <div class="fp-group">
+        <label class="fp-label">Altura (U)</label>
+        <select class="fp-input" onchange="rackUpdateEquipment('${pop.id}', '${item.id}', 'u', this.value)">
+          ${[1, 2, 3, 4].map(n => `<option value="${n}" ${parseInt(item.u) === n ? 'selected' : ''}>${n}U</option>`).join('')}
+        </select>
+      </div>
+      ${field('ip', 'IP de gerência', 'placeholder="Ex.: 10.0.0.1"')}
+    </div>
+    ${PORT_FACES.includes(cat.face) ? `
+      <div class="fp-row">
+        ${field('rj45', cat.face === 'patch' ? 'Portas (keystone)' : 'Portas RJ45', 'type="number" min="0" max="96"')}
+        ${cat.face === 'patch' ? '' : field('sfp', 'Portas SFP / SFP+', 'type="number" min="0" max="48"')}
+      </div>` : ''}
+    <div class="fp-group">
+      <label class="fp-label">Observações</label>
+      <textarea class="fp-input" style="height:60px; resize:vertical;" onchange="rackUpdateEquipment('${pop.id}', '${item.id}', 'obs', this.value)">${item.obs || ''}</textarea>
+    </div>
+    ${rackMoveButtons(pop, key)}
+    <button class="btn-full danger" onclick="rackRemoveEquipment('${pop.id}', '${item.id}')">🗑️ Remover do rack</button>`;
+}
+
 // ================================================================
 //  AÇÕES
 // ================================================================
+
+/** Adiciona um equipamento do catálogo no fim do rack e abre a edição dele */
+function rackAddEquipment(popId, type) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const cat = catalogEntry(type);
+  if (!pop.rackItems) pop.rackItems = [];
+  const same = pop.rackItems.filter(i => i.type === type).length;
+  const item = {
+    id: 'eq_' + Date.now(),
+    type,
+    name: same ? `${cat.label} ${same + 1}` : cat.label,
+    model: '',
+    u: cat.u,
+    rj45: cat.rj45,
+    sfp: cat.sfp,
+    ip: '',
+    obs: '',
+  };
+  pop.rackItems.push(item);
+  saveLocal();
+  rackSelect({ popId, type: 'eq', eqId: item.id });
+  toast(`✅ ${item.name} adicionado no rack`);
+}
+
+function rackUpdateEquipment(popId, eqId, prop, value) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const item = (pop.rackItems || []).find(i => i.id === eqId);
+  if (!item) return;
+  if (['u', 'rj45', 'sfp'].includes(prop)) value = Math.max(0, parseInt(value) || 0);
+  if (prop === 'u') value = Math.min(4, Math.max(1, value));
+  item[prop] = value;
+  saveLocal();
+  renderPanel();
+}
+
+function rackRemoveEquipment(popId, eqId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const item = (pop.rackItems || []).find(i => i.id === eqId);
+  if (!item || !confirm(`Remover ${item.name} do rack?`)) return;
+  pop.rackItems = pop.rackItems.filter(i => i.id !== eqId);
+  pop.rackOrder = (pop.rackOrder || []).filter(k => k !== 'eq:' + eqId);
+  saveLocal();
+  rackSelect({ popId, type: 'pop' });
+}
+
+/** Sobe (-1) ou desce (+1) uma peça no rack */
+function rackMove(popId, key, dir) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const keys = getRackEntries(pop).map(e => e.key);
+  const i = keys.indexOf(key);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= keys.length) return;
+  [keys[i], keys[j]] = [keys[j], keys[i]];
+  pop.rackOrder = keys;
+  saveLocal();
+  renderPanel();
+}
+
+/** Rack em tela cheia (esconde o mapa) ou no tamanho normal */
+function rackToggleFull() {
+  window.rackFull = !window.rackFull;
+  renderPanel();
+}
 
 function rackAddOlt(popId) {
   addOltEquipment(popId);

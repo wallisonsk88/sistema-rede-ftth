@@ -28,7 +28,9 @@ function renderPanel() {
     if (STATE.selectedId) panel.classList.add('mobile-open');
     else panel.classList.remove('mobile-open');
     // POP abre o rack: painel mais largo
-    panel.classList.toggle('panel-wide', STATE.activeTab === 'props' && STATE.olts.some(o => o.id === STATE.selectedId));
+    const popOpen = STATE.activeTab === 'props' && STATE.olts.some(o => o.id === STATE.selectedId);
+    panel.classList.toggle('panel-wide', popOpen);
+    panel.classList.toggle('panel-full', popOpen && !!window.rackFull);
   }
   if (typeof afterRenderRack === 'function') afterRenderRack();
 }
