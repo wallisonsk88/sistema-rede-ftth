@@ -3,7 +3,8 @@
  *
  * O rack mostra só o que existe no projeto:
  *   - OLT: cada OLT cadastrada no POP (portas PON em gaiolas SFP, 16 por U)
- *   - DIO: cada cabo tronco que sai do POP (adaptadores SC/APC, 24 por U)
+ *   - DIO: equipamento com a quantidade de portas escolhida (adaptadores SC/APC, 24 por U);
+ *     cada fibra dos cabos tronco é terminada numa porta (pop.dios[].terms = { porta: { cableId, fiber } })
  *   - Equipamentos que o usuário adicionar do catálogo (switch, MikroTik, borda,
  *     CGNAT, nobreak...), guardados em pop.rackItems
  *   - Cordões de manobra: da porta PON até a fibra do DIO em que o ramal está ligado
@@ -12,7 +13,7 @@
  * A ordem das peças fica em pop.rackOrder. Clicar numa peça abre a edição dela ao lado.
  */
 
-// Peça selecionada no rack: { popId, type: 'pop' | 'olt' | 'pon' | 'dio' | 'fiber' | 'eq' | 'catalog' | 'port', oltId, ponIndex, cableId, fiber, eqId, port }
+// Peça selecionada no rack: { popId, type: 'pop' | 'olt' | 'pon' | 'dio' | 'dioport' | 'eq' | 'catalog' | 'port', oltId, ponIndex, dioId, dioPort, eqId, port }
 window.rackSel = window.rackSel || null;
 
 const PONS_PER_ROW = 8;
@@ -50,7 +51,7 @@ function getRackEntries(pop) {
   const entries = [
     ...getOltPorts(pop).map(o => ({ key: 'olt:' + o.olt.id, kind: 'olt', olt: o.olt, ports: o.ports })),
     ...(pop.rackItems || []).map(item => ({ key: 'eq:' + item.id, kind: 'eq', item })),
-    ...getPopRootCables(pop.id).map(cable => ({ key: 'dio:' + cable.id, kind: 'dio', cable })),
+    ...getPopDios(pop).map(dio => ({ key: 'dio:' + dio.id, kind: 'dio', dio })),
   ];
   const order = pop.rackOrder || [];
   const rank = (e, i) => { const k = order.indexOf(e.key); return k >= 0 ? k : 1000 + i; };
@@ -63,14 +64,56 @@ function rackSelect(sel) {
 }
 
 function getRackSel(pop) {
-  const sel = window.rackSel;
+  let sel = window.rackSel;
   if (!sel || sel.popId !== pop.id) return { popId: pop.id, type: 'pop' };
+  // Fibra do cabo -> porta do DIO em que ela está terminada
+  if (sel.type === 'fiber') {
+    const t = getTerminationIndex(pop)[`${sel.cableId}:${sel.fiber}`];
+    sel = t ? { popId: pop.id, type: 'dioport', dioId: t.dio.id, dioPort: t.port } : { popId: pop.id, type: 'pop' };
+  }
+  if (sel.dioId && !getPopDios(pop).some(d => d.id === sel.dioId)) return { popId: pop.id, type: 'pop' };
   // Peça que deixou de existir (OLT removida, cabo apagado) volta para o POP
   if (sel.oltId && !pop.oltEquipments.some(o => o.id === sel.oltId)) return { popId: pop.id, type: 'pop' };
   if (sel.cableId && !STATE.cables.some(c => c.id === sel.cableId)) return { popId: pop.id, type: 'pop' };
   if (sel.eqId && !(pop.rackItems || []).some(i => i.id === sel.eqId)) return { popId: pop.id, type: 'pop' };
   if (sel.type === 'port' && !portExists(pop, sel.port)) return { popId: pop.id, type: 'pop' };
   return sel;
+}
+
+// ================================================================
+//  DIO: portas e terminação das fibras
+// ================================================================
+
+const DIO_SIZES = [6, 12, 24, 36, 48, 72, 96, 144];
+
+/**
+ * DIOs do POP. Projetos antigos (sem pop.dios) ganham um DIO por cabo tronco com a
+ * fibra N na porta N. Terminações de cabos apagados ou acima do total de portas são limpas.
+ */
+function getPopDios(pop) {
+  if (!pop.dios) {
+    pop.dios = getPopRootCables(pop.id).map(c => {
+      const terms = {};
+      for (let f = 1; f <= c.fibers; f++) terms[f] = { cableId: c.id, fiber: f };
+      return { id: c.id, name: c.name, ports: c.fibers, terms };
+    });
+  }
+  pop.dios.forEach(d => {
+    if (!d.terms) d.terms = {};
+    Object.keys(d.terms).forEach(p => {
+      const t = d.terms[p];
+      const c = STATE.cables.find(x => x.id === t.cableId);
+      if (!c || t.fiber > c.fibers || parseInt(p) > d.ports) delete d.terms[p];
+    });
+  });
+  return pop.dios;
+}
+
+/** { "cabo:fibra": { dio, port } } de todas as fibras terminadas no POP */
+function getTerminationIndex(pop) {
+  const idx = {};
+  getPopDios(pop).forEach(dio => Object.entries(dio.terms).forEach(([p, t]) => { idx[`${t.cableId}:${t.fiber}`] = { dio, port: parseInt(p) }; }));
+  return idx;
 }
 
 // ================================================================
@@ -299,34 +342,45 @@ function renderRack(pop, sel) {
           </div>
         </div>`;
     } else if (entry.kind === 'dio') {
-      const { cable } = entry;
-      const uSize = Math.max(1, Math.ceil(cable.fibers / (DIO_PER_ROW * 2)));
+      const { dio } = entry;
+      const uSize = Math.max(1, Math.ceil(dio.ports / (DIO_PER_ROW * 2)));
       addU(uSize);
       let adapters = '';
-      for (let f = 1; f <= cable.fibers; f++) {
-        const fColor = FIBER_COLORS[(f - 1) % FIBER_COLORS.length];
-        const info = getRamalInfo(cable.fiberMapping[f]);
-        const selected = isSel('fiber', { cableId: cable.id, fiber: f }) ? ' selected' : '';
-        const title = `${fiberLabel(f, cable.fibers)} — ${info ? info.label : 'livre'}`;
-        adapters += `
-          <button class="dio-port ${info ? 'on' : 'off'}${selected}" data-fiber="${cable.id}:${f}" title="${title}"
-            onclick="rackSelect({ popId: '${pop.id}', type: 'fiber', cableId: '${cable.id}', fiber: ${f} })"
-            ondragover="rackDragOver(event)" ondragleave="this.classList.remove('drop-ok')" ondrop="rackDropRamal(event, '${cable.id}', ${f})"
-            onmouseenter="${info ? `rackHover('pon-${info.pon.index}', true)` : ''}" onmouseleave="${info ? `rackHover('pon-${info.pon.index}', false)` : ''}">
-            <span class="dio-ring" style="background:${fColor.hex}"></span>
-            <span class="dio-num">${f}</span>
-          </button>`;
+      for (let p = 1; p <= dio.ports; p++) {
+        const t = dio.terms[p];
+        const cable = t && STATE.cables.find(c => c.id === t.cableId);
+        const selected = isSel('dioport', { dioId: dio.id, dioPort: p }) ? ' selected' : '';
+        const drop = `ondragover="rackDragOver(event)" ondragleave="this.classList.remove('drop-ok')" ondrop="rackDropOnDio(event, '${dio.id}', ${p})"`;
+        const click = `onclick="rackSelect({ popId: '${pop.id}', type: 'dioport', dioId: '${dio.id}', dioPort: ${p} })"`;
+        if (cable) {
+          const fColor = FIBER_COLORS[(t.fiber - 1) % FIBER_COLORS.length];
+          const info = getRamalInfo(cable.fiberMapping[t.fiber]);
+          const hover = info ? `onmouseenter="rackHover('pon-${info.pon.index}', true)" onmouseleave="rackHover('pon-${info.pon.index}', false)"` : '';
+          adapters += `
+            <button class="dio-port ${info ? 'on' : 'off'}${selected}" data-dio-port="${dio.id}:${p}" data-fiber="${cable.id}:${t.fiber}"
+              title="Porta ${p} · ${cable.name} · ${fiberLabel(t.fiber, cable.fibers)} — ${info ? info.label : 'sem ramal'}"
+              draggable="true" ondragstart="rackDragDioPort(event, '${dio.id}', ${p})" ${click} ${drop} ${hover}>
+              <span class="dio-ring" style="background:${fColor.hex}"></span>
+              <span class="dio-num">${p}</span>
+            </button>`;
+        } else {
+          adapters += `
+            <button class="dio-port empty${selected}" data-dio-port="${dio.id}:${p}" title="Porta ${p} — vazia (arraste uma fibra do cabo até aqui)" ${click} ${drop}>
+              <span class="dio-cap"></span>
+              <span class="dio-num">${p}</span>
+            </button>`;
+        }
       }
-      const used = Object.keys(cable.fiberMapping || {}).filter(f => getRamalInfo(cable.fiberMapping[f])).length;
+      const terminated = Object.keys(dio.terms).length;
       units += `
-        <div class="rack-unit dio-unit${isSel('dio', { cableId: cable.id }) ? ' selected' : ''}" style="--u:${uSize}">
+        <div class="rack-unit dio-unit${isSel('dio', { dioId: dio.id }) ? ' selected' : ''}" style="--u:${uSize}">
           ${screws}
-          <div class="dio-plate" onclick="rackSelect({ popId: '${pop.id}', type: 'dio', cableId: '${cable.id}' })" title="Configurar DIO do ${cable.name}">
-            <div class="dio-title">DIO</div>
-            <div class="dio-cable">${cable.name}</div>
-            <div class="dio-count">${used}/${cable.fibers} FO</div>
+          <div class="dio-plate" onclick="rackSelect({ popId: '${pop.id}', type: 'dio', dioId: '${dio.id}' })" title="Configurar ${dio.name}">
+            <div class="dio-title">DIO · ${dio.ports} PORTAS</div>
+            <div class="dio-cable">${dio.name}</div>
+            <div class="dio-count">${terminated}/${dio.ports} com fibra</div>
           </div>
-          <div class="dio-ports" style="--cols:${Math.min(DIO_PER_ROW, cable.fibers)}">${adapters}</div>
+          <div class="dio-ports" style="--cols:${Math.min(DIO_PER_ROW, dio.ports)}">${adapters}</div>
         </div>`;
     } else {
       const { item } = entry;
@@ -422,8 +476,8 @@ function renderRackDetail(pop, sel) {
   switch (sel.type) {
     case 'olt': return renderOltDetail(pop, pop.oltEquipments.find(o => o.id === sel.oltId));
     case 'pon': return renderPonDetail(pop, sel.ponIndex);
-    case 'dio': return renderDioDetail(pop, STATE.cables.find(c => c.id === sel.cableId));
-    case 'fiber': return renderFiberDetail(pop, STATE.cables.find(c => c.id === sel.cableId), sel.fiber);
+    case 'dio': return renderDioDetail(pop, getPopDios(pop).find(d => d.id === sel.dioId));
+    case 'dioport': return renderDioPortDetail(pop, getPopDios(pop).find(d => d.id === sel.dioId), sel.dioPort);
     case 'eq': return renderEquipDetail(pop, (pop.rackItems || []).find(i => i.id === sel.eqId));
     case 'catalog': return renderCatalog(pop);
     case 'port': return renderPortDetail(pop, sel.port);
@@ -443,17 +497,24 @@ function renderPopDetail(pop) {
   const ports = getOltPorts(pop).flatMap(o => o.ports);
   const configured = ports.filter(p => p.pon).length;
   const ramais = (pop.pons || []).reduce((n, p) => n + (p.ramais || []).length, 0);
-  const cables = getPopRootCables(pop.id);
-  const fibers = cables.reduce((n, c) => n + c.fibers, 0);
-  const usedFibers = cables.reduce((n, c) => n + Object.keys(c.fiberMapping || {}).length, 0);
+  const dios = getPopDios(pop);
+  const dioPorts = dios.reduce((n, d) => n + d.ports, 0);
+  const dioUsed = dios.reduce((n, d) => n + Object.keys(d.terms).length, 0);
+  const idx = getTerminationIndex(pop);
+  const loose = getPopRootCables(pop.id).map(c => {
+    let n = 0;
+    for (let f = 1; f <= c.fibers; f++) if (!idx[`${c.id}:${f}`]) n++;
+    return { c, n };
+  }).filter(x => x.n);
   return `
     ${detailHeader('🏢', pop.name, 'POP · rack principal')}
     <div class="rack-stats">
       <div><b>${pop.oltEquipments.length}</b><span>OLT(s)</span></div>
       <div><b>${configured}/${ports.length}</b><span>PONs com rota</span></div>
       <div><b>${ramais}</b><span>ramais</span></div>
-      <div><b>${usedFibers}/${fibers}</b><span>fibras no DIO</span></div>
+      <div><b>${dioUsed}/${dioPorts}</b><span>portas de DIO com fibra</span></div>
     </div>
+    ${loose.map(({ c, n }) => `<div class="rack-hint">⚠️ <b>${c.name}</b>: ${n} fibra(s) fora do DIO. Abra um DIO e arraste as fibras até as portas.</div>`).join('')}
     <div class="rack-hint">👉 Clique numa <b>porta PON</b> da OLT para configurar a rota e os ramais, ou numa <b>fibra do DIO</b> para ver o que está ligado nela.</div>
 
     <div class="fp-group">
@@ -700,70 +761,147 @@ function renderRamalBlock(pop, pon, i, ramal, olt, ponToOltMap) {
   return ramalHtml + `</div>`;
 }
 
-function renderDioDetail(pop, cable) {
-  const used = [];
-  for (let f = 1; f <= cable.fibers; f++) {
-    const info = getRamalInfo(cable.fiberMapping[f]);
-    if (info) used.push({ f, info });
-  }
+function renderDioDetail(pop, dio) {
+  const idx = getTerminationIndex(pop);
+  const terminated = Object.keys(dio.terms).length;
+  const withRamal = [];
+  Object.entries(dio.terms).forEach(([p, t]) => {
+    const cable = STATE.cables.find(c => c.id === t.cableId);
+    const info = cable && getRamalInfo(cable.fiberMapping[t.fiber]);
+    if (info) withRamal.push({ p: parseInt(p), t, cable, info });
+  });
+  withRamal.sort((a, b) => a.p - b.p);
+
+  const cables = getPopRootCables(pop.id);
+  const cableGroups = cables.map(c => {
+    let done = 0;
+    let chips = '';
+    for (let f = 1; f <= c.fibers; f++) {
+      const fColor = FIBER_COLORS[(f - 1) % FIBER_COLORS.length];
+      const at = idx[`${c.id}:${f}`];
+      const info = getRamalInfo(c.fiberMapping[f]);
+      if (at) done++;
+      const where = at ? `P${at.port}` : '';
+      const elsewhere = at && at.dio.id !== dio.id;
+      chips += `
+        <span class="fiber-chip${at ? ' done' : ''}${elsewhere ? ' elsewhere' : ''}" draggable="true" ondragstart="rackDragFiber(event, '${c.id}', ${f})"
+          title="${fiberLabel(f, c.fibers)}${info ? ' — ' + info.label : ''}${at ? ' · na ' + at.dio.name + ' porta ' + at.port : ' · arraste até uma porta do DIO'}"
+          ${at ? `onclick="rackSelect({ popId: '${pop.id}', type: 'dioport', dioId: '${at.dio.id}', dioPort: ${at.port} })"` : ''}>
+          <i style="background:${fColor.hex}"></i>${f}${where ? `<small>${where}</small>` : ''}${info ? '<b class="fiber-chip-signal"></b>' : ''}
+        </span>`;
+    }
+    return `
+      <div class="fiber-group">
+        <div class="fiber-group-head">
+          <span><b>🧵 ${c.name}</b> <small>${done}/${c.fibers} terminadas</small></span>
+          ${done < c.fibers ? `<button class="rack-mini-btn" onclick="rackAutoTerminate('${pop.id}', '${dio.id}', '${c.id}')" title="Coloca as fibras que faltam nas próximas portas livres deste DIO">↧ Em sequência</button>` : ''}
+        </div>
+        <div class="fiber-chips">${chips}</div>
+        <div class="fiber-olts">Sai das OLTs:
+          ${pop.oltEquipments.map(o => `
+            <label><input type="checkbox" ${getCableOltIds(c).includes(o.id) ? 'checked' : ''} onchange="toggleCableOltLink('${c.id}', '${o.id}', this.checked)"> ${o.name}</label>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
   return `
-    ${detailHeader('🗄️', `DIO · ${cable.name}`, `${used.length}/${cable.fibers} fibras ligadas na OLT`)}
-    <div class="fp-group">
-      <label class="fp-label">Sai das OLTs</label>
-      <div class="rack-checklist">
-        ${pop.oltEquipments.map(o => `
-          <label>
-            <input type="checkbox" ${getCableOltIds(cable).includes(o.id) ? 'checked' : ''} onchange="toggleCableOltLink('${cable.id}', '${o.id}', this.checked)">
-            ${o.name}
-          </label>`).join('')}
+    ${detailHeader('🗄️', `DIO · ${dio.name}`, `${terminated}/${dio.ports} portas com fibra · ${withRamal.length} ligada(s) na OLT`)}
+    <div class="fp-row">
+      <div class="fp-group">
+        <label class="fp-label">Nome do DIO</label>
+        <input class="fp-input" value="${dio.name}" onchange="rackUpdateDio('${pop.id}', '${dio.id}', 'name', this.value)">
       </div>
-      <div style="font-size:9px; color:var(--text3); margin-top:2px;">Nenhuma marcada = aceita ramais de todas as OLTs do POP.</div>
+      <div class="fp-group">
+        <label class="fp-label">Quantidade de portas</label>
+        <select class="fp-input" onchange="rackUpdateDio('${pop.id}', '${dio.id}', 'ports', this.value)">
+          ${DIO_SIZES.map(n => `<option value="${n}" ${dio.ports === n ? 'selected' : ''}>${n} portas</option>`).join('')}
+        </select>
+      </div>
     </div>
+
     <div class="fp-group">
-      <label class="fp-label">Fibras ligadas</label>
-      ${used.length === 0 ? '<div class="rack-hint">Nenhuma fibra ligada. Clique numa fibra do DIO ou arraste um ramal até ela.</div>' : used.map(({ f, info }) => `
-        <button class="rack-fiber-row" onclick="rackSelect({ popId: '${pop.id}', type: 'fiber', cableId: '${cable.id}', fiber: ${f} })">
-          <span class="color-dot" style="background:${FIBER_COLORS[(f - 1) % FIBER_COLORS.length].hex}"></span>
-          <span><b>${fiberLabel(f, cable.fibers)}</b><br>${info.label}</span>
+      <label class="fp-label">✋ Fibras dos cabos — segure e arraste até uma porta do DIO</label>
+      ${cables.length ? cableGroups : '<div class="rack-hint">Nenhum cabo tronco saindo deste POP. Lance um cabo a partir do POP no mapa.</div>'}
+      <div style="font-size:9px; color:var(--text3); margin-top:4px;">Dentro do rack, arraste uma porta ocupada até outra porta para mudar a fibra de lugar (se a outra estiver ocupada, elas trocam).</div>
+    </div>
+
+    <div class="fp-group">
+      <label class="fp-label">Fibras ligadas na OLT</label>
+      ${withRamal.length === 0 ? '<div class="rack-hint">Nenhuma porta com ramal. Arraste um ramal (⠿ na PON) até uma porta com fibra.</div>' : withRamal.map(({ p, t, cable, info }) => `
+        <button class="rack-fiber-row" onclick="rackSelect({ popId: '${pop.id}', type: 'dioport', dioId: '${dio.id}', dioPort: ${p} })">
+          <span class="color-dot" style="background:${FIBER_COLORS[(t.fiber - 1) % FIBER_COLORS.length].hex}"></span>
+          <span><b>Porta ${p}</b> · ${cable.name} · ${fiberLabel(t.fiber, cable.fibers)}<br>${info.label}</span>
         </button>`).join('')}
     </div>
-    ${rackMoveButtons(pop, 'dio:' + cable.id)}
-    <button class="btn-full primary" onclick="selectElement('${cable.id}')">🧵 Abrir propriedades do cabo</button>`;
+
+    ${rackMoveButtons(pop, 'dio:' + dio.id)}
+    <div class="rack-btn-row">
+      <button class="rack-btn" ${terminated ? '' : 'disabled'} onclick="rackClearDio('${pop.id}', '${dio.id}')">✂ Tirar todas as fibras</button>
+      <button class="rack-btn danger" onclick="rackRemoveDio('${pop.id}', '${dio.id}')">🗑️ Remover DIO</button>
+    </div>`;
 }
 
-function renderFiberDetail(pop, cable, fiber) {
-  const fColor = FIBER_COLORS[(fiber - 1) % FIBER_COLORS.length];
-  const current = cable.fiberMapping[fiber] || '';
-  const info = getRamalInfo(current);
-  const ponToOltMap = buildPonToOltMap(pop);
+function renderDioPortDetail(pop, dio, port) {
+  const t = dio.terms[port];
+  const cable = t && STATE.cables.find(c => c.id === t.cableId);
+  const idx = getTerminationIndex(pop);
 
-  // Ramais que podem sair nesta fibra (das OLTs ligadas ao cabo)
-  const options = (pop.pons || []).filter(pon => cableAcceptsOlt(cable, ponToOltMap[pon.index]) || (pon.ramais || []).some(r => r.id === current))
-    .flatMap(pon => (pon.ramais || []).map(r => {
-      let where = '';
-      getPopRootCables(pop.id).forEach(c => Object.keys(c.fiberMapping || {}).forEach(f => {
-        if (c.fiberMapping[f] === r.id && !(c.id === cable.id && parseInt(f) === fiber)) where = ` (hoje em ${c.name} F${f} — será movido)`;
-      }));
-      return `<option value="${r.id}" ${r.id === current ? 'selected' : ''}>${getRamalInfo(r.id).label}${where}</option>`;
-    })).join('');
+  // Fibras de todos os cabos tronco do POP para escolher nesta porta
+  const fiberOptions = getPopRootCables(pop.id).map(c => {
+    let opts = '';
+    for (let f = 1; f <= c.fibers; f++) {
+      const at = idx[`${c.id}:${f}`];
+      const here = at && at.dio.id === dio.id && at.port === port;
+      opts += `<option value="${c.id}:${f}" ${here ? 'selected' : ''}>${fiberLabel(f, c.fibers)}${at && !here ? ` (hoje na ${at.dio.name} porta ${at.port} — será movida)` : ''}</option>`;
+    }
+    return `<optgroup label="${c.name}">${opts}</optgroup>`;
+  }).join('');
 
+  let ramalPart = '';
+  if (cable) {
+    const fiber = t.fiber;
+    const current = cable.fiberMapping[fiber] || '';
+    const info = getRamalInfo(current);
+    const ponToOltMap = buildPonToOltMap(pop);
+    const options = (pop.pons || []).filter(pon => cableAcceptsOlt(cable, ponToOltMap[pon.index]) || (pon.ramais || []).some(r => r.id === current))
+      .flatMap(pon => (pon.ramais || []).map(r => {
+        let where = '';
+        getPopRootCables(pop.id).forEach(c => Object.keys(c.fiberMapping || {}).forEach(f => {
+          if (c.fiberMapping[f] === r.id && !(c.id === cable.id && parseInt(f) === fiber)) where = ` (hoje em ${c.name} F${f} — será movido)`;
+        }));
+        return `<option value="${r.id}" ${r.id === current ? 'selected' : ''}>${getRamalInfo(r.id).label}${where}</option>`;
+      })).join('');
+    ramalPart = `
+      <div class="rack-fiber-status ${info ? 'on' : 'off'}">
+        ${info ? `🟢 <b>${info.label}</b>` : '⚪ Fibra sem ramal — não está ligada em nenhuma porta da OLT'}
+      </div>
+      <div class="fp-group">
+        <label class="fp-label">Ligar nesta fibra o ramal</label>
+        <select class="fp-input" onchange="setFiberMapping('${cable.id}', ${fiber}, this.value)">
+          <option value="">-- Livre --</option>
+          ${options}
+        </select>
+      </div>
+      ${info ? `
+        <div class="rack-btn-row">
+          <button class="rack-btn" onclick="highlightRamal('${pop.id}', '${current}')">🔍 Ver no mapa</button>
+          <button class="rack-btn" onclick="rackSelect({ popId: '${pop.id}', type: 'pon', ponIndex: ${info.pon.index} })">🔌 Ir para a PON</button>
+        </div>` : ''}`;
+  }
+
+  const icon = cable ? `<span class="color-dot big" style="background:${FIBER_COLORS[(t.fiber - 1) % FIBER_COLORS.length].hex}"></span>` : '🔘';
   return `
-    ${detailHeader(`<span class="color-dot big" style="background:${fColor.hex}"></span>`, fiberLabel(fiber, cable.fibers), `DIO · ${cable.name}`)}
-    <div class="rack-fiber-status ${info ? 'on' : 'off'}">
-      ${info ? `🟢 <b>${info.label}</b>` : '⚪ Fibra livre — não está ligada em nenhuma porta da OLT'}
-    </div>
+    ${detailHeader(icon, `Porta ${port} · ${dio.name}`, cable ? `${cable.name} · ${fiberLabel(t.fiber, cable.fibers)}` : 'Porta vazia')}
     <div class="fp-group">
-      <label class="fp-label">Ligar nesta fibra o ramal</label>
-      <select class="fp-input" onchange="setFiberMapping('${cable.id}', ${fiber}, this.value)">
-        <option value="">-- Livre --</option>
-        ${options}
+      <label class="fp-label">Fibra nesta porta</label>
+      <select class="fp-input" onchange="rackTerminate('${pop.id}', '${dio.id}', ${port}, this.value)">
+        <option value="">-- Vazia --</option>
+        ${fiberOptions}
       </select>
+      ${!cable ? '<div style="font-size:9px; color:var(--text3); margin-top:2px;">Ou abra o DIO e arraste a fibra até esta porta.</div>' : ''}
     </div>
-    ${info ? `
-      <div class="rack-btn-row">
-        <button class="rack-btn" onclick="highlightRamal('${pop.id}', '${current}')">🔍 Ver no mapa</button>
-        <button class="rack-btn" onclick="rackSelect({ popId: '${pop.id}', type: 'pon', ponIndex: ${info.pon.index} })">🔌 Ir para a PON</button>
-      </div>` : ''}`;
+    ${ramalPart}
+    <button class="btn-full" style="background:var(--surface2);" onclick="rackSelect({ popId: '${pop.id}', type: 'dio', dioId: '${dio.id}' })">← Voltar para ${dio.name}</button>`;
 }
 
 function rackMoveButtons(pop, key) {
@@ -783,12 +921,15 @@ function renderCatalog(pop) {
       <button class="eq-card" onclick="rackAddOlt('${pop.id}')">
         <span class="eq-card-icon">🖥️</span><b>OLT GPON</b><span>Portas PON para as rotas</span>
       </button>
+      <button class="eq-card" onclick="rackAddDio('${pop.id}')">
+        <span class="eq-card-icon">🗄️</span><b>DIO</b><span>Distribuidor óptico: termine as fibras dos cabos nas portas</span>
+      </button>
       ${EQUIPMENT_CATALOG.map(c => `
         <button class="eq-card" onclick="rackAddEquipment('${pop.id}', '${c.type}')">
           <span class="eq-card-icon">${c.icon}</span><b>${c.label}</b><span>${c.desc}</span>
         </button>`).join('')}
     </div>
-    <div class="rack-hint" style="margin-top:12px;">🗄️ O <b>DIO</b> aparece sozinho no rack para cada cabo tronco que sai deste POP.</div>`;
+    <div class="rack-hint" style="margin-top:12px;">🗄️ No <b>DIO</b> você escolhe a quantidade de portas e arrasta cada fibra do cabo tronco até a porta que quiser.</div>`;
 }
 
 function renderEquipDetail(pop, item) {
@@ -1007,12 +1148,8 @@ function rackDragOver(ev) {
   ev.currentTarget.classList.add('drop-ok');
 }
 
-/** Soltar um ramal numa fibra do DIO: liga o ramal nessa fibra (sai da que estava) */
-function rackDropRamal(ev, cableId, fiber) {
-  ev.preventDefault();
-  document.querySelector('.rack')?.classList.remove('dragging-ramal');
-  const ramalId = ev.dataTransfer.getData('text/ramal');
-  if (!ramalId) return;
+/** Liga o ramal numa fibra do cabo (recusa fibra ocupada e cabo que não sai da OLT do ramal) */
+function rackConnectRamalAt(cableId, fiber, ramalId) {
   const cable = STATE.cables.find(c => c.id === cableId);
   const other = getRamalInfo(cable.fiberMapping[fiber]);
   if (other && other.ramal.id !== ramalId) {
@@ -1030,7 +1167,157 @@ function rackDropRamal(ev, cableId, fiber) {
   toast(`🔗 ${info ? info.ramal.name : 'Ramal'} ligado na ${fiberLabel(fiber, cable.fibers)} do ${cable.name}`);
 }
 
-document.addEventListener('dragend', () => document.querySelector('.rack')?.classList.remove('dragging-ramal'));
+function rackDragFiber(ev, cableId, fiber) {
+  ev.dataTransfer.setData('text/fiber', `${cableId}:${fiber}`);
+  ev.dataTransfer.effectAllowed = 'move';
+  document.querySelector('.rack')?.classList.add('dragging-fiber');
+}
+
+function rackDragDioPort(ev, dioId, port) {
+  ev.dataTransfer.setData('text/dioport', `${dioId}:${port}`);
+  ev.dataTransfer.effectAllowed = 'move';
+  document.querySelector('.rack')?.classList.add('dragging-fiber');
+}
+
+/**
+ * Soltar numa porta do DIO:
+ *   - fibra do cabo: termina a fibra na porta (sai da porta em que estava)
+ *   - outra porta do DIO: muda a fibra de lugar (troca se a porta estiver ocupada)
+ *   - ramal: liga o ramal na fibra que está nesta porta
+ */
+function rackDropOnDio(ev, dioId, port) {
+  ev.preventDefault();
+  document.querySelector('.rack')?.classList.remove('dragging-ramal', 'dragging-fiber');
+  const pop = STATE.olts.find(o => o.id === window.rackSel?.popId) || STATE.olts.find(o => (o.dios || []).some(d => d.id === dioId));
+  const dio = pop && getPopDios(pop).find(d => d.id === dioId);
+  if (!dio) return;
+  const t = dio.terms[port];
+  const ramalId = ev.dataTransfer.getData('text/ramal');
+  const fiberData = ev.dataTransfer.getData('text/fiber');
+  const fromPort = ev.dataTransfer.getData('text/dioport');
+
+  if (ramalId) {
+    if (!t) {
+      toast('⚠️ Esta porta está vazia: arraste antes uma fibra do cabo para ela.');
+      renderPanel();
+      return;
+    }
+    rackConnectRamalAt(t.cableId, t.fiber, ramalId);
+    return;
+  }
+  if (fiberData) {
+    if (t && `${t.cableId}:${t.fiber}` !== fiberData) {
+      const c = STATE.cables.find(x => x.id === t.cableId);
+      toast(`⚠️ A porta ${port} já tem ${c ? c.name : 'outra fibra'} F${t.fiber}. Solte numa porta vazia.`);
+      renderPanel();
+      return;
+    }
+    rackTerminate(pop.id, dioId, port, fiberData);
+    return;
+  }
+  if (fromPort) {
+    const [srcDioId, srcPort] = [fromPort.slice(0, fromPort.lastIndexOf(':')), parseInt(fromPort.slice(fromPort.lastIndexOf(':') + 1))];
+    const src = getPopDios(pop).find(d => d.id === srcDioId);
+    if (!src || (src.id === dio.id && srcPort === port) || !src.terms[srcPort]) return;
+    const moving = src.terms[srcPort];
+    delete src.terms[srcPort];
+    if (t) src.terms[srcPort] = t;       // troca de lugar
+    dio.terms[port] = moving;
+    saveLocal();
+    renderPanel();
+    toast(t ? `🔄 Portas ${srcPort} e ${port} trocadas` : `➡️ Fibra movida para a porta ${port}`);
+  }
+}
+
+/** Termina a fibra ("cabo:fibra") na porta do DIO; vazio = deixa a porta vazia */
+function rackTerminate(popId, dioId, port, value) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const dio = getPopDios(pop).find(d => d.id === dioId);
+  if (!dio) return;
+  delete dio.terms[port];
+  if (value) {
+    const i = value.lastIndexOf(':');
+    const cableId = value.slice(0, i);
+    const fiber = parseInt(value.slice(i + 1));
+    // Uma fibra fica em uma porta só
+    getPopDios(pop).forEach(d => Object.keys(d.terms).forEach(p => {
+      if (d.terms[p].cableId === cableId && d.terms[p].fiber === fiber) delete d.terms[p];
+    }));
+    dio.terms[port] = { cableId, fiber };
+    const cable = STATE.cables.find(c => c.id === cableId);
+    toast(`🧵 ${cable ? cable.name : 'Cabo'} ${fiberLabel(fiber, cable ? cable.fibers : 12)} na porta ${port} do ${dio.name}`);
+  }
+  saveLocal();
+  renderPanel();
+}
+
+/** Coloca as fibras do cabo que ainda não estão em DIO nas próximas portas livres */
+function rackAutoTerminate(popId, dioId, cableId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const dio = getPopDios(pop).find(d => d.id === dioId);
+  const cable = STATE.cables.find(c => c.id === cableId);
+  const idx = getTerminationIndex(pop);
+  let p = 1;
+  let n = 0;
+  for (let f = 1; f <= cable.fibers; f++) {
+    if (idx[`${cableId}:${f}`]) continue;
+    while (p <= dio.ports && dio.terms[p]) p++;
+    if (p > dio.ports) break;
+    dio.terms[p] = { cableId, fiber: f };
+    n++;
+  }
+  saveLocal();
+  renderPanel();
+  toast(n ? `🧵 ${n} fibra(s) do ${cable.name} terminadas no ${dio.name}` : `⚠️ ${dio.name} sem portas livres`);
+}
+
+function rackAddDio(popId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const dios = getPopDios(pop);
+  const dio = { id: 'dio_' + Date.now(), name: 'DIO ' + String(dios.length + 1).padStart(2, '0'), ports: 24, terms: {} };
+  dios.push(dio);
+  saveLocal();
+  rackSelect({ popId, type: 'dio', dioId: dio.id });
+  toast(`✅ ${dio.name} adicionado no rack`);
+}
+
+function rackUpdateDio(popId, dioId, prop, value) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const dio = getPopDios(pop).find(d => d.id === dioId);
+  if (!dio) return;
+  if (prop === 'ports') {
+    value = parseInt(value) || 12;
+    const lost = Object.keys(dio.terms).filter(p => parseInt(p) > value).length;
+    if (lost && !confirm(`${lost} fibra(s) estão em portas acima de ${value} e vão sair do DIO. Continuar?`)) {
+      renderPanel();
+      return;
+    }
+  }
+  dio[prop] = value;
+  saveLocal();
+  renderPanel();
+}
+
+function rackClearDio(popId, dioId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const dio = getPopDios(pop).find(d => d.id === dioId);
+  if (!dio || !confirm(`Tirar todas as fibras do ${dio.name}?`)) return;
+  dio.terms = {};
+  saveLocal();
+  renderPanel();
+}
+
+function rackRemoveDio(popId, dioId) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const dio = getPopDios(pop).find(d => d.id === dioId);
+  if (!dio || !confirm(`Remover o ${dio.name} do rack? As fibras dele ficam fora do DIO.`)) return;
+  pop.dios = pop.dios.filter(d => d.id !== dioId);
+  pop.rackOrder = (pop.rackOrder || []).filter(k => k !== 'dio:' + dioId);
+  saveLocal();
+  rackSelect({ popId, type: 'pop' });
+}
+
+document.addEventListener('dragend', () => document.querySelector('.rack')?.classList.remove('dragging-ramal', 'dragging-fiber'));
 
 // ================================================================
 //  CORDÕES DE MANOBRA (PON -> DIO)

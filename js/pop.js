@@ -70,6 +70,7 @@ function addPOP(lat, lng) {
       { id: 'olt_' + Date.now(), name: 'OLT Principal', ports: 8 }
     ],
     pons: [],
+    dios: [], // DIOs do rack: o usuário escolhe as portas e termina as fibras
   };
   obj.layer = createPOPMarker(obj);
   STATE.olts.push(obj);

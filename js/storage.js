@@ -79,6 +79,7 @@ function serializeState() {
       rackItems: o.rackItems || [],
       rackOrder: o.rackOrder || [],
       rackLinks: o.rackLinks || [],
+      dios: o.dios,
       portInfo: o.portInfo || {},
       obs: o.obs,
     })),

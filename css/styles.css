@@ -1132,3 +1132,36 @@ svg:focus, path:focus, .leaflet-interactive:focus { outline: none !important; }
 .link-row { grid-template-columns: 10px 1fr 14px 1fr; }
 .link-dot { width: 8px; height: 8px; border-radius: 50%; }
 .link-arrow { color: var(--text3); text-align: center; }
+
+
+/* DIO com portas escolhidas e fibras arrastadas */
+.dio-port.empty { background: linear-gradient(180deg, #3f4652, #2a303a); border-color: #111; filter: none; }
+.dio-cap { width: 10px; height: 10px; border-radius: 2px; background: #111827; box-shadow: inset 0 0 0 1px #4b5563; }
+.dio-port.empty .dio-num { color: #94a3b8; }
+.rack.dragging-fiber .dio-port.empty { outline: 1px dashed #86efac; }
+.rack.dragging-ramal .dio-port.empty { opacity: .45; }
+.dio-port[draggable="true"] { cursor: grab; }
+
+.fiber-group { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+.fiber-group-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; color: var(--text); }
+.fiber-group-head small { color: var(--text3); font-weight: 400; }
+.fiber-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 4px; }
+.fiber-chip {
+  position: relative; display: flex; align-items: center; gap: 4px;
+  padding: 4px 6px; border-radius: 5px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 10px; font-weight: 700;
+  cursor: grab; user-select: none;
+}
+.fiber-chip:hover { border-color: var(--primary); }
+.fiber-chip i { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 1px solid rgba(255,255,255,.65); }
+.fiber-chip small { font-size: 8px; font-weight: 600; color: #86efac; margin-left: auto; }
+.fiber-chip.done { opacity: .6; cursor: pointer; }
+.fiber-chip-signal { position: absolute; top: 2px; right: 2px; width: 5px; height: 5px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 4px #22c55e; }
+.fiber-olts { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; font-size: 9.5px; color: var(--text3); }
+.fiber-olts label { display: flex; align-items: center; gap: 3px; color: var(--text2); cursor: pointer; }
+.fiber-olts input { accent-color: var(--primary); }
+.rack-mini-btn { padding: 3px 8px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--primary); font-size: 10px; font-weight: 700; font-family: 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
+.rack-mini-btn:hover { border-color: var(--primary); }
+
+.fiber-chip.elsewhere small { color: #93c5fd; }
+.fiber-chip small { white-space: nowrap; }
