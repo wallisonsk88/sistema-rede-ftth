@@ -1100,3 +1100,35 @@ svg:focus, path:focus, .leaflet-interactive:focus { outline: none !important; }
 .eq-card b { font-size: 12px; } .eq-card span:last-child { font-size: 10px; color: var(--text3); line-height: 1.35; }
 
 @keyframes rackSpin { to { transform: rotate(360deg); } }
+
+
+/* Portas dos equipamentos (clicáveis) e ligações */
+.eqp { border: 0; padding: 0; cursor: pointer; font: inherit; transition: transform .12s; }
+.eqp:hover { transform: scale(1.15); z-index: 2; }
+.eqp.selected { outline: 2px solid var(--primary); outline-offset: 1px; }
+.eq-rj45 i, .eq-sfp i { background: #1e293b; box-shadow: none; animation: none; }
+.eq-rj45:nth-child(4n) i { background: #1e293b; box-shadow: none; }
+.eqp.linked i { background: #22c55e; box-shadow: 0 0 5px #22c55e; animation: rackBlink 1.1s infinite; }
+.eqp.linked:nth-child(3n) i { animation-duration: .55s; }
+.eqp.named i { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+.olt-uplink { flex: 0 0 auto; display: grid; grid-template-columns: repeat(var(--cols), 18px); gap: 3px; align-content: center; }
+.olt-uplink .eq-rj45 { height: 16px; }
+.olt-uplink .eq-sfp { width: 18px; height: 14px; }
+.rack-cords .link-cord path:last-child { stroke-dasharray: none; }
+
+.port-table { display: flex; flex-direction: column; gap: 3px; max-height: 320px; overflow-y: auto; }
+.port-row {
+  display: grid; grid-template-columns: 96px 1fr 1.4fr; gap: 6px; align-items: center;
+  padding: 5px 8px; text-align: left; border-radius: 5px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); font-size: 10.5px; font-family: 'Inter', sans-serif; cursor: pointer;
+}
+.port-row:hover { border-color: var(--primary); }
+.port-row.linked { border-left: 3px solid #22c55e; }
+.port-row-id { font-weight: 700; color: var(--text2); }
+.port-row-name i { color: var(--text3); }
+.port-row-link { color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.port-row.linked .port-row-link { color: #86efac; }
+.link-row { grid-template-columns: 10px 1fr 14px 1fr; }
+.link-dot { width: 8px; height: 8px; border-radius: 50%; }
+.link-arrow { color: var(--text3); text-align: center; }

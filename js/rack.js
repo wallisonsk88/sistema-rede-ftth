@@ -7,10 +7,12 @@
  *   - Equipamentos que o usuário adicionar do catálogo (switch, MikroTik, borda,
  *     CGNAT, nobreak...), guardados em pop.rackItems
  *   - Cordões de manobra: da porta PON até a fibra do DIO em que o ramal está ligado
+ *   - Ligações entre portas dos equipamentos (documentação): pop.rackLinks, com o nome/função
+ *     de cada porta em pop.portInfo. Porta = "dispositivo|porta", ex.: "eq:e2|rj45-1", "olt:vsol|up-1"
  * A ordem das peças fica em pop.rackOrder. Clicar numa peça abre a edição dela ao lado.
  */
 
-// Peça selecionada no rack: { popId, type: 'pop' | 'olt' | 'pon' | 'dio' | 'fiber' | 'eq' | 'catalog', oltId, ponIndex, cableId, fiber, eqId }
+// Peça selecionada no rack: { popId, type: 'pop' | 'olt' | 'pon' | 'dio' | 'fiber' | 'eq' | 'catalog' | 'port', oltId, ponIndex, cableId, fiber, eqId, port }
 window.rackSel = window.rackSel || null;
 
 const PONS_PER_ROW = 8;
@@ -67,7 +69,148 @@ function getRackSel(pop) {
   if (sel.oltId && !pop.oltEquipments.some(o => o.id === sel.oltId)) return { popId: pop.id, type: 'pop' };
   if (sel.cableId && !STATE.cables.some(c => c.id === sel.cableId)) return { popId: pop.id, type: 'pop' };
   if (sel.eqId && !(pop.rackItems || []).some(i => i.id === sel.eqId)) return { popId: pop.id, type: 'pop' };
+  if (sel.type === 'port' && !portExists(pop, sel.port)) return { popId: pop.id, type: 'pop' };
   return sel;
+}
+
+// ================================================================
+//  PORTAS E LIGAÇÕES ENTRE EQUIPAMENTOS (documentação)
+// ================================================================
+
+const LINK_TYPES = {
+  utp:   { label: 'Cabo de rede (UTP)', color: '#3b82f6' },
+  fibra: { label: 'Cordão óptico',      color: '#facc15' },
+  dac:   { label: 'DAC / cabo direto',  color: '#a3a3a3' },
+};
+
+// Sugestões para a função da porta (o usuário pode escrever qualquer coisa)
+const PORT_SUGGESTIONS = ['Link operadora', 'Trânsito IP', 'Uplink', 'Concentrador PPPoE', 'CGNAT', 'OLT', 'Switch',
+  'Gerência', 'Servidor', 'Cache CDN', 'Backup', 'Cliente dedicado', 'Rádio / enlace', 'Trunk', 'Livre'];
+
+/** Portas de um dispositivo do rack ('eq:<id>' ou 'olt:<id>') */
+function getDevicePorts(pop, dev) {
+  const [kind, id] = dev.split(':');
+  const ports = [];
+  const add = (n, type, label) => { for (let k = 1; k <= n; k++) ports.push({ id: `${type}-${k}`, type, label: `${label} ${k}` }); };
+  if (kind === 'eq') {
+    const item = (pop.rackItems || []).find(i => i.id === id);
+    if (!item || !PORT_FACES.includes(catalogEntry(item.type).face)) return ports;
+    add(parseInt(item.rj45) || 0, 'rj45', catalogEntry(item.type).face === 'patch' ? 'Keystone' : 'Porta');
+    add(parseInt(item.sfp) || 0, 'sfp', 'SFP');
+  } else if (kind === 'olt') {
+    const olt = pop.oltEquipments.find(o => o.id === id);
+    if (!olt) return ports;
+    add(olt.upRj45 !== undefined ? parseInt(olt.upRj45) || 0 : 4, 'up', 'Uplink GE');
+    add(olt.upSfp !== undefined ? parseInt(olt.upSfp) || 0 : 2, 'upsfp', 'Uplink SFP+');
+  }
+  return ports;
+}
+
+function deviceName(pop, dev) {
+  const [kind, id] = dev.split(':');
+  if (kind === 'olt') return (pop.oltEquipments.find(o => o.id === id) || {}).name || 'OLT';
+  return ((pop.rackItems || []).find(i => i.id === id) || {}).name || 'Equipamento';
+}
+
+/** Todos os dispositivos do rack que têm portas, na ordem do rack */
+function getPortDevices(pop) {
+  return getRackEntries(pop).filter(e => e.kind !== 'dio').map(e => e.key).filter(dev => getDevicePorts(pop, dev).length);
+}
+
+function splitPort(pk) {
+  const i = pk.lastIndexOf('|');
+  return { dev: pk.slice(0, i), port: pk.slice(i + 1) };
+}
+
+function portExists(pop, pk) {
+  if (!pk || !pk.includes('|')) return false;
+  const { dev, port } = splitPort(pk);
+  return getDevicePorts(pop, dev).some(p => p.id === port);
+}
+
+function portLabel(pop, pk) {
+  const { dev, port } = splitPort(pk);
+  return (getDevicePorts(pop, dev).find(p => p.id === port) || {}).label || port;
+}
+
+function getPortInfo(pop, pk) {
+  return (pop.portInfo || {})[pk] || {};
+}
+
+function findLink(pop, pk) {
+  return (pop.rackLinks || []).find(l => l.a === pk || l.b === pk);
+}
+
+function otherEnd(link, pk) {
+  return link.a === pk ? link.b : link.a;
+}
+
+/** "CCR PPPoE · Porta 2 (Concentrador)" */
+function describePort(pop, pk) {
+  const { dev } = splitPort(pk);
+  const name = getPortInfo(pop, pk).name;
+  return `${deviceName(pop, dev)} · ${portLabel(pop, pk)}${name ? ` (${name})` : ''}`;
+}
+
+/** Tira ligações e nomes de portas que não existem mais (equipamento removido, menos portas) */
+function pruneRackLinks(pop) {
+  pop.rackLinks = (pop.rackLinks || []).filter(l => portExists(pop, l.a) && portExists(pop, l.b));
+  Object.keys(pop.portInfo || {}).forEach(pk => { if (!portExists(pop, pk)) delete pop.portInfo[pk]; });
+}
+
+/** Botão de uma porta de equipamento: LED verde = ligada, âmbar = só com nome */
+function portButton(pop, pk, port, sel) {
+  const link = findLink(pop, pk);
+  const info = getPortInfo(pop, pk);
+  const cls = port.type === 'rj45' || port.type === 'up' ? 'eq-rj45' : 'eq-sfp';
+  const state = link ? ' linked' : (info.name ? ' named' : '');
+  const selected = sel.type === 'port' && sel.port === pk ? ' selected' : '';
+  const title = `${port.label}${info.name ? ' — ' + info.name : ''}${link ? ' ⇄ ' + describePort(pop, otherEnd(link, pk)) : ' (livre)'}`;
+  const hover = link ? `onmouseenter="rackHover('link-${link.id}', true)" onmouseleave="rackHover('link-${link.id}', false)"` : '';
+  return `<button class="${cls} eqp${state}${selected}" data-port="${pk}" title="${title}" ${hover}
+    onclick="event.stopPropagation(); rackSelect({ popId: '${pop.id}', type: 'port', port: '${pk}' })"><i></i></button>`;
+}
+
+/** Tabela de documentação das portas de um dispositivo */
+function renderPortTable(pop, dev) {
+  const ports = getDevicePorts(pop, dev);
+  if (!ports.length) return '';
+  return `
+    <div class="fp-group">
+      <label class="fp-label">🔌 Portas e ligações <span style="font-weight:400; color:var(--text3);">(clique para documentar)</span></label>
+      <div class="port-table">
+        ${ports.map(p => {
+          const pk = `${dev}|${p.id}`;
+          const info = getPortInfo(pop, pk);
+          const link = findLink(pop, pk);
+          return `
+            <button class="port-row${link ? ' linked' : ''}" onclick="rackSelect({ popId: '${pop.id}', type: 'port', port: '${pk}' })"
+              ${link ? `onmouseenter="rackHover('link-${link.id}', true)" onmouseleave="rackHover('link-${link.id}', false)"` : ''}>
+              <span class="port-row-id">${p.label}</span>
+              <span class="port-row-name">${info.name || '<i>sem nome</i>'}</span>
+              <span class="port-row-link">${link ? '⇄ ' + describePort(pop, otherEnd(link, pk)) : '—'}</span>
+            </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+/** Lista de todas as ligações do rack (documentação do POP) */
+function renderLinkList(pop) {
+  const links = pop.rackLinks || [];
+  if (!links.length) return '';
+  return `
+    <div class="fp-group">
+      <label class="fp-label">🔗 Ligações entre equipamentos (${links.length})</label>
+      <div class="port-table">
+        ${links.map(l => `
+          <button class="port-row linked link-row" onclick="rackSelect({ popId: '${pop.id}', type: 'port', port: '${l.a}' })"
+            onmouseenter="rackHover('link-${l.id}', true)" onmouseleave="rackHover('link-${l.id}', false)">
+            <span class="link-dot" style="background:${(LINK_TYPES[l.type] || LINK_TYPES.utp).color}"></span>
+            <span>${describePort(pop, l.a)}</span><span class="link-arrow">⇄</span><span>${describePort(pop, l.b)}</span>
+          </button>`).join('')}
+      </div>
+    </div>`;
 }
 
 /** Portas PON de cada OLT com o índice global (OLT 1 = 1..N, OLT 2 = N+1..) */
@@ -107,6 +250,7 @@ function renderPOPProps(pop) {
 }
 
 function renderRack(pop, sel) {
+  pruneRackLinks(pop);
   const isSel = (type, extra) => sel.type === type && Object.keys(extra).every(k => sel[k] === extra[k]);
   const screws = '<span class="screw tl"></span><span class="screw bl"></span><span class="screw tr"></span><span class="screw br"></span>';
   let units = '';
@@ -149,8 +293,8 @@ function renderRack(pop, sel) {
             <div class="olt-leds"><span class="led pwr" title="PWR"></span><span class="led sys" title="SYS"></span><span class="led alm" title="ALM"></span></div>
           </div>
           <div class="olt-ports" style="--cols:${Math.min(PONS_PER_ROW, ports.length)}">${portsHtml}</div>
-          <div class="olt-uplink" title="Uplink / gerência">
-            <span class="rj45"></span><span class="rj45"></span><span class="rj45"></span><span class="rj45"></span>
+          <div class="olt-uplink" style="--cols:${Math.max(1, Math.ceil(getDevicePorts(pop, 'olt:' + olt.id).length / 2))}">
+            ${getDevicePorts(pop, 'olt:' + olt.id).map(p => portButton(pop, `olt:${olt.id}|${p.id}`, p, sel)).join('')}
             <span class="console">CON</span>
           </div>
         </div>`;
@@ -188,7 +332,7 @@ function renderRack(pop, sel) {
       const { item } = entry;
       const uSize = Math.max(1, parseInt(item.u) || 1);
       addU(uSize);
-      units += renderEquipUnit(pop, item, uSize, isSel('eq', { eqId: item.id }), screws);
+      units += renderEquipUnit(pop, item, uSize, isSel('eq', { eqId: item.id }), screws, sel);
     }
   });
 
@@ -224,23 +368,24 @@ function renderRack(pop, sel) {
 }
 
 /** Frente do equipamento conforme o tipo (desenho ilustrativo; as portas não têm ligação no projeto) */
-function renderEquipUnit(pop, item, uSize, selected, screws) {
+function renderEquipUnit(pop, item, uSize, selected, screws, sel) {
   const cat = catalogEntry(item.type);
   const face = cat.face;
   const rows = uSize * 2;
-  const portGrid = (n, cls, label) => {
-    if (!n) return '';
-    const cols = Math.ceil(n / rows);
-    let html = '';
-    for (let k = 1; k <= n; k++) html += `<span class="${cls}" title="${label} ${k}"><i></i></span>`;
-    return `<div class="eq-ports" style="--cols:${cols}">${html}</div>`;
+  const dev = 'eq:' + item.id;
+  const devPorts = getDevicePorts(pop, dev);
+  const portGrid = type => {
+    const ports = devPorts.filter(p => p.type === type);
+    if (!ports.length) return '';
+    const cols = Math.ceil(ports.length / rows);
+    return `<div class="eq-ports" style="--cols:${cols}">${ports.map(p => portButton(pop, `${dev}|${p.id}`, p, sel)).join('')}</div>`;
   };
 
   let body = '';
   if (PORT_FACES.includes(face)) {
     const lcd = face === 'mikrotik' || face === 'server' ? `<div class="eq-lcd">${face === 'server' ? 'OK' : (item.ip || 'RouterOS')}</div>` : '';
     const bays = face === 'server' ? `<div class="eq-bays" style="--cols:${uSize * 2}">${'<span></span>'.repeat(uSize * 4)}</div>` : '';
-    body = `${bays}${portGrid(parseInt(item.rj45) || 0, 'eq-rj45', face === 'patch' ? 'Keystone' : 'Porta RJ45')}${portGrid(parseInt(item.sfp) || 0, 'eq-sfp', 'SFP')}${lcd}`;
+    body = `${bays}${portGrid('rj45')}${portGrid('sfp')}${lcd}`;
   } else if (face === 'ups') {
     body = `
       <div class="eq-ups-lcd"><b>${item.type === 'retificadora' ? '-48V DC' : '220V · 100%'}</b><span>${'▮'.repeat(5)}</span></div>
@@ -281,6 +426,7 @@ function renderRackDetail(pop, sel) {
     case 'fiber': return renderFiberDetail(pop, STATE.cables.find(c => c.id === sel.cableId), sel.fiber);
     case 'eq': return renderEquipDetail(pop, (pop.rackItems || []).find(i => i.id === sel.eqId));
     case 'catalog': return renderCatalog(pop);
+    case 'port': return renderPortDetail(pop, sel.port);
     default: return renderPopDetail(pop);
   }
 }
@@ -323,6 +469,7 @@ function renderPopDetail(pop) {
     </div>
     ${typeof renderPhotoGallery === 'function' ? renderPhotoGallery(pop.id) : ''}
 
+    ${renderLinkList(pop)}
     <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
       <button class="btn-full primary" onclick="rackSelect({ popId: '${pop.id}', type: 'catalog' })">＋ Adicionar equipamento</button>
       <button class="btn-full" style="background:var(--surface2);" onclick="clearHighlight()">🧹 Limpar Rastreamento</button>
@@ -349,6 +496,16 @@ function renderOltDetail(pop, olt) {
       <div class="fp-group">
         <label class="fp-label">Potência TX (dBm)</label>
         <input class="fp-input" type="number" step="0.5" value="${olt.outputPower !== undefined ? olt.outputPower : (pop.outputPower || 4)}" onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'outputPower', this.value)">
+      </div>
+    </div>
+    <div class="fp-row">
+      <div class="fp-group">
+        <label class="fp-label">Uplink RJ45 (GE)</label>
+        <input class="fp-input" type="number" min="0" max="16" value="${olt.upRj45 !== undefined ? olt.upRj45 : 4}" onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'upRj45', Math.max(0, parseInt(this.value) || 0))">
+      </div>
+      <div class="fp-group">
+        <label class="fp-label">Uplink SFP+ (10G)</label>
+        <input class="fp-input" type="number" min="0" max="16" value="${olt.upSfp !== undefined ? olt.upSfp : 2}" onchange="updateOltEquipment('${pop.id}', '${olt.id}', 'upSfp', Math.max(0, parseInt(this.value) || 0))">
       </div>
     </div>
     <div class="fp-group">
@@ -383,6 +540,7 @@ function renderOltDetail(pop, olt) {
       </div>
     </div>
 
+    ${renderPortTable(pop, 'olt:' + olt.id)}
     ${rackMoveButtons(pop, 'olt:' + olt.id)}
     <button class="btn-full danger" onclick="removeOltEquipment('${pop.id}', '${olt.id}')">🗑️ Remover OLT</button>`;
 }
@@ -663,8 +821,68 @@ function renderEquipDetail(pop, item) {
       <label class="fp-label">Observações</label>
       <textarea class="fp-input" style="height:60px; resize:vertical;" onchange="rackUpdateEquipment('${pop.id}', '${item.id}', 'obs', this.value)">${item.obs || ''}</textarea>
     </div>
+    ${renderPortTable(pop, key)}
     ${rackMoveButtons(pop, key)}
     <button class="btn-full danger" onclick="rackRemoveEquipment('${pop.id}', '${item.id}')">🗑️ Remover do rack</button>`;
+}
+
+/** Documentação de uma porta: função e em qual porta de outro equipamento ela está ligada */
+function renderPortDetail(pop, pk) {
+  const { dev } = splitPort(pk);
+  const info = getPortInfo(pop, pk);
+  const link = findLink(pop, pk);
+  const other = link ? otherEnd(link, pk) : '';
+  const [kind, id] = dev.split(':');
+  const icon = kind === 'olt' ? '🖥️' : catalogEntry(((pop.rackItems || []).find(i => i.id === id) || {}).type).icon;
+  const back = kind === 'olt' ? `{ popId: '${pop.id}', type: 'olt', oltId: '${id}' }` : `{ popId: '${pop.id}', type: 'eq', eqId: '${id}' }`;
+
+  // Portas dos outros equipamentos, agrupadas por equipamento
+  const options = getPortDevices(pop).filter(d => d !== dev).map(d => `
+    <optgroup label="${deviceName(pop, d)}">
+      ${getDevicePorts(pop, d).map(p => {
+        const opk = `${d}|${p.id}`;
+        const busy = findLink(pop, opk);
+        const taken = busy && busy !== link;
+        const name = getPortInfo(pop, opk).name;
+        return `<option value="${opk}" ${opk === other ? 'selected' : ''} ${taken ? 'disabled' : ''}>${p.label}${name ? ' — ' + name : ''}${taken ? ' (ligada em ' + describePort(pop, otherEnd(busy, opk)) + ')' : ''}</option>`;
+      }).join('')}
+    </optgroup>`).join('');
+
+  return `
+    ${detailHeader(icon, `${deviceName(pop, dev)} · ${portLabel(pop, pk)}`, link ? '🟢 Ligada' : (info.name ? '🟠 Documentada, sem ligação' : 'Porta livre'))}
+    <div class="fp-group">
+      <label class="fp-label">Função / nome da porta</label>
+      <input class="fp-input" list="port-suggestions" value="${info.name || ''}" placeholder="Ex.: Link operadora, Concentrador, OLT VSOL"
+        onchange="rackSetPortName('${pop.id}', '${pk}', this.value)">
+      <datalist id="port-suggestions">${PORT_SUGGESTIONS.map(s => `<option value="${s}">`).join('')}</datalist>
+    </div>
+    <div class="fp-group">
+      <label class="fp-label">Ligada em</label>
+      <select class="fp-input" onchange="rackLinkPort('${pop.id}', '${pk}', this.value)">
+        <option value="">-- Não ligada --</option>
+        ${options}
+      </select>
+      ${getPortDevices(pop).length < 2 ? '<div style="font-size:9px; color:var(--text3); margin-top:2px;">Adicione outro equipamento com portas para fazer a ligação.</div>' : ''}
+    </div>
+    ${link ? `
+      <div class="fp-row">
+        <div class="fp-group">
+          <label class="fp-label">Tipo de cabo</label>
+          <select class="fp-input" onchange="rackSetLinkProp('${pop.id}', '${link.id}', 'type', this.value)">
+            ${Object.entries(LINK_TYPES).map(([k, t]) => `<option value="${k}" ${link.type === k ? 'selected' : ''}>${t.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="fp-group">
+          <label class="fp-label">Observação da ligação</label>
+          <input class="fp-input" value="${link.note || ''}" placeholder="Ex.: VLAN 100, 10G" onchange="rackSetLinkProp('${pop.id}', '${link.id}', 'note', this.value)">
+        </div>
+      </div>
+      <div class="rack-fiber-status on">⇄ <b>${describePort(pop, other)}</b>${link.note ? ` · ${link.note}` : ''}</div>
+      <div class="rack-btn-row">
+        <button class="rack-btn" onclick="rackSelect({ popId: '${pop.id}', type: 'port', port: '${other}' })">↔ Ir para a outra ponta</button>
+        <button class="rack-btn danger" onclick="rackLinkPort('${pop.id}', '${pk}', '')">✂ Desligar</button>
+      </div>` : ''}
+    <button class="btn-full" style="background:var(--surface2);" onclick="rackSelect(${back})">← Voltar para ${deviceName(pop, dev)}</button>`;
 }
 
 // ================================================================
@@ -713,6 +931,38 @@ function rackRemoveEquipment(popId, eqId) {
   pop.rackOrder = (pop.rackOrder || []).filter(k => k !== 'eq:' + eqId);
   saveLocal();
   rackSelect({ popId, type: 'pop' });
+}
+
+function rackSetPortName(popId, pk, value) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  if (!pop.portInfo) pop.portInfo = {};
+  value = value.trim();
+  if (value) pop.portInfo[pk] = { ...(pop.portInfo[pk] || {}), name: value };
+  else delete pop.portInfo[pk];
+  saveLocal();
+  renderPanel();
+}
+
+/** Liga a porta `pk` na porta `target` (vazio = desliga). Cada porta tem uma ligação só. */
+function rackLinkPort(popId, pk, target) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  pop.rackLinks = (pop.rackLinks || []).filter(l => l.a !== pk && l.b !== pk && (!target || (l.a !== target && l.b !== target)));
+  if (target) {
+    const isSfp = p => /sfp/.test(splitPort(p).port);
+    pop.rackLinks.push({ id: 'lk_' + Date.now(), a: pk, b: target, type: isSfp(pk) || isSfp(target) ? 'fibra' : 'utp', note: '' });
+    toast(`🔗 ${describePort(pop, pk)} ⇄ ${describePort(pop, target)}`);
+  }
+  saveLocal();
+  renderPanel();
+}
+
+function rackSetLinkProp(popId, linkId, prop, value) {
+  const pop = STATE.olts.find(o => o.id === popId);
+  const link = (pop.rackLinks || []).find(l => l.id === linkId);
+  if (!link) return;
+  link[prop] = value;
+  saveLocal();
+  renderPanel();
 }
 
 /** Sobe (-1) ou desce (+1) uma peça no rack */
@@ -824,6 +1074,25 @@ function drawRackCords() {
           <path d="${d}" stroke="${color}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
         </g>`;
     });
+  });
+  // Ligações entre equipamentos: saem pela lateral direita do rack, como no organizador de cabos
+  const side = base.width - 10;
+  (pop.rackLinks || []).forEach(l => {
+    const ea = rack.querySelector(`[data-port="${l.a}"]`);
+    const eb = rack.querySelector(`[data-port="${l.b}"]`);
+    if (!ea || !eb) return;
+    const a = center(ea);
+    const b = center(eb);
+    const x = Math.min(side, Math.max(a.x, b.x) + 40);
+    const d = `M ${a.x} ${a.y} C ${x} ${a.y}, ${x} ${b.y}, ${b.x} ${b.y}`;
+    const color = (LINK_TYPES[l.type] || LINK_TYPES.utp).color;
+    const key = `link-${l.id}`;
+    paths += `
+      <g class="cord link-cord${window.rackHoverKey === key ? ' active' : ''}" data-key="${key}">
+        <title>${describePort(pop, l.a)} ⇄ ${describePort(pop, l.b)}${l.note ? ' · ' + l.note : ''}</title>
+        <path d="${d}" stroke="rgba(0,0,0,0.6)" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path d="${d}" stroke="${color}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      </g>`;
   });
   svg.innerHTML = paths;
 }
