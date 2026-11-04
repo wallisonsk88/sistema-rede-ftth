@@ -12,8 +12,42 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentUser = await requireAuth();
   document.getElementById('user-email').innerText = currentUser.email;
   await migrateLocalProjects();
+  // Primeira vez na cópia: traz uma cópia dos projetos do sistema principal
+  const existing = await userProjectsRef(currentUser.uid).limit(1).get();
+  if (existing.empty) await importMainProjects(true);
   loadProjects();
 });
+
+/**
+ * Copia para esta versão de teste os projetos do sistema principal que ainda não
+ * estão aqui. Os do principal só são lidos, nunca alterados. As cópias que já
+ * existem aqui não são substituídas.
+ */
+async function importMainProjects(silent) {
+  try {
+    const [mainList, here] = await Promise.all([
+      mainProjectsRef(currentUser.uid).get(),
+      userProjectsRef(currentUser.uid).get(),
+    ]);
+    const already = new Set(here.docs.map(d => d.id));
+    let count = 0;
+    for (const doc of mainList.docs) {
+      if (already.has(doc.id)) continue;
+      const data = await mainProjectDataRef(currentUser.uid).doc(doc.id).get();
+      if (!data.exists) continue;
+      const batch = fbDB.batch();
+      batch.set(userProjectsRef(currentUser.uid).doc(doc.id), doc.data());
+      batch.set(userProjectDataRef(currentUser.uid).doc(doc.id), data.data());
+      await batch.commit();
+      count++;
+    }
+    if (!silent) alert(count ? `✅ ${count} projeto(s) copiado(s) do sistema principal.` : 'Todos os projetos do sistema principal já estão aqui.');
+    if (!silent) loadProjects();
+  } catch (e) {
+    console.error('Erro ao copiar projetos do sistema principal:', e);
+    if (!silent) alert('Erro ao copiar projetos: ' + e.message);
+  }
+}
 
 function escapeHTML(str) {
   return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
