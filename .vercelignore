@@ -3,3 +3,5 @@ firebase.json
 firestore.rules
 patch.js
 *.xlsx
+.env*
+.vercel

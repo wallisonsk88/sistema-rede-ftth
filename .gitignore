@@ -2,3 +2,5 @@ node_modules/
 read.js
 package-lock.json
 package.json
+.vercel
+.env*
