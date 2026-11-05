@@ -882,10 +882,10 @@ svg:focus, path:focus, .leaflet-interactive:focus { outline: none !important; }
 /* ================================================================
    RACK DO POP (rack.js)
    ================================================================ */
-.panel-right.panel-wide { width: min(1120px, 96vw); }
+.panel-right.panel-wide { width: min(920px, 72vw); }
 .panel-right.panel-full { width: calc(100vw - 64px); }
 .rack-layout { display: flex; gap: 16px; align-items: flex-start; }
-.rack-col { flex: 0 0 540px; position: sticky; top: 0; }
+.rack-col { flex: 0 0 480px; position: sticky; top: 0; }
 .panel-full .rack-col { flex-basis: 640px; }
 .rack-detail { flex: 1; min-width: 0; }
 @media (max-width: 1000px) {
