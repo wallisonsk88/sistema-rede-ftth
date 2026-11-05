@@ -5,10 +5,6 @@
  *   users/{uid}/projects/{projectId}     -> { name, updatedAt }        (lista do dashboard)
  *   users/{uid}/projectData/{projectId}  -> { json, updatedAt }        (conteúdo do projeto)
  *
- * CÓPIA DE TESTE: esta versão grava em coleções próprias (sufixo DATA_AREA), então
- * nada do que é feito aqui altera os projetos do sistema principal. Os projetos do
- * principal só são lidos, para trazer uma cópia deles (ver dashboard.js).
- *
  * O conteúdo é salvo como string JSON porque o Firestore não aceita arrays
  * aninhados (ex.: path do cabo = [[lat, lng], ...]).
  */
@@ -29,22 +25,11 @@ const fbDB = firebase.firestore();
 // Cache offline: continua funcionando sem internet e sincroniza quando voltar
 fbDB.enablePersistence({ synchronizeTabs: true }).catch(e => console.warn('Cache offline indisponível:', e.code));
 
-// Sufixo das coleções desta versão ('' no sistema principal)
-const DATA_AREA = '_copia';
-
-/** Referências das coleções do usuário logado (nesta versão) */
+/** Referências das coleções do usuário logado */
 function userProjectsRef(uid) {
-  return fbDB.collection('users').doc(uid).collection('projects' + DATA_AREA);
-}
-function userProjectDataRef(uid) {
-  return fbDB.collection('users').doc(uid).collection('projectData' + DATA_AREA);
-}
-
-/** Coleções do sistema principal (só leitura aqui na cópia) */
-function mainProjectsRef(uid) {
   return fbDB.collection('users').doc(uid).collection('projects');
 }
-function mainProjectDataRef(uid) {
+function userProjectDataRef(uid) {
   return fbDB.collection('users').doc(uid).collection('projectData');
 }
 
