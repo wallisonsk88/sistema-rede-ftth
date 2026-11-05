@@ -109,6 +109,27 @@ function cableAddPoint(lat, lng) {
   currentCablePolyline.setLatLngs(currentCablePoints);
 }
 
+/**
+ * Ponta do cabo chegando numa CEO: encosta nela e, se a CEO ainda não usa outro cabo com
+ * sinal, este passa a ser o cabo de entrada dela (o sinal continua de CEO em CEO).
+ * Vale para cabo novo, "Continuar Traçado" e "Ajuste Fino". Retorna o texto para o aviso.
+ */
+function attachCableEndToSplice(cable) {
+  if (!cable.path || cable.path.length < 2) return '';
+  const end = cable.path[cable.path.length - 1];
+  const endSplice = STATE.splices.find(s => s.id !== cable.sourceId && s.cableId !== cable.id &&
+    !isDownstreamOfSplice(cable, s.id) && map.distance(end, [s.lat, s.lng]) <= 20);
+  if (!endSplice) return '';
+  cable.path[cable.path.length - 1] = [endSplice.lat, endSplice.lng];
+  const current = STATE.cables.find(c => c.id === endSplice.cableId);
+  const inUse = Object.values(endSplice.fusions || {}).some(f => Object.keys(f).length) || (endSplice.splitter && endSplice.splitter.inputFiber);
+  if (!inUse && !(current && countActiveFibersAt(current, [endSplice.lat, endSplice.lng]))) {
+    endSplice.cableId = cable.id;
+    return ` Ligado como entrada da ${endSplice.name}.`;
+  }
+  return ` Chegou na ${endSplice.name}: escolha-o em "Cabo de entrada" no painel dela.`;
+}
+
 /** Finaliza o traçado do cabo e salva */
 function finishCable() {
   if (!currentCableSourceId || currentCablePoints.length < 2) {
@@ -121,6 +142,7 @@ function finishCable() {
     const cable = STATE.cables.find(c => c.id === currentEditingCableId);
     if (cable) {
       cable.path = [...currentCablePoints];
+      const endMsg = attachCableEndToSplice(cable);
       if (cable.layer) {
         map.removeLayer(cable.layer);
       }
@@ -130,7 +152,7 @@ function finishCable() {
       clearCableDraw();
       setTool('select');
       selectElement(id);
-      toast('✅ Traçado do cabo atualizado!');
+      toast('✅ Traçado do cabo atualizado!' + endMsg);
     } else {
       clearCableDraw();
     }
@@ -149,22 +171,7 @@ function finishCable() {
     fiberMapping: {}     // { "1": "ramalId" }
   };
 
-  // Ponta do cabo chegando numa CEO: encosta nela e, se a CEO ainda não usa outro cabo com
-  // sinal, este passa a ser o cabo de entrada dela (o sinal continua de CEO em CEO)
-  let endMsg = '';
-  const end = obj.path[obj.path.length - 1];
-  const endSplice = STATE.splices.find(s => s.id !== obj.sourceId && !isDownstreamOfSplice(obj, s.id) && map.distance(end, [s.lat, s.lng]) <= 20);
-  if (endSplice) {
-    obj.path[obj.path.length - 1] = [endSplice.lat, endSplice.lng];
-    const current = STATE.cables.find(c => c.id === endSplice.cableId);
-    const inUse = Object.values(endSplice.fusions || {}).some(f => Object.keys(f).length) || (endSplice.splitter && endSplice.splitter.inputFiber);
-    if (!inUse && !(current && countActiveFibersAt(current, [endSplice.lat, endSplice.lng]))) {
-      endSplice.cableId = obj.id;
-      endMsg = ` Ligado como entrada da ${endSplice.name}.`;
-    } else {
-      endMsg = ` Chegou na ${endSplice.name}: escolha-o em "Cabo de entrada" no painel dela.`;
-    }
-  }
+  const endMsg = attachCableEndToSplice(obj);
 
   STATE.cables.push(obj);
   clearCableDraw();
@@ -296,14 +303,17 @@ function toggleGeomanEditCable(id) {
      isGeomanEditingCableId = null;
      document.body.classList.remove('editing-cable');
      map.doubleClickZoom.enable();
+     const endMsg = attachCableEndToSplice(cable);
+     if (endMsg) cable.layer.setLatLngs(cable.path);
      saveLocal();
-     toast('💾 Ajuste fino do cabo salvo com sucesso!');
+     toast('💾 Ajuste fino do cabo salvo com sucesso!' + endMsg);
   } else {
      // Se já houver outro cabo sendo editado, desliga ele primeiro
      if (isGeomanEditingCableId) {
         const oldCable = STATE.cables.find(c => c.id === isGeomanEditingCableId);
         if (oldCable && oldCable.layer) {
            oldCable.layer.pm.disable();
+           if (attachCableEndToSplice(oldCable)) oldCable.layer.setLatLngs(oldCable.path);
            saveLocal();
         }
      }
