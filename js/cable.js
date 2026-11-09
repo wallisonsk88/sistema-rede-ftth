@@ -492,7 +492,7 @@ function isUnbalancedSplitter(splitter) {
 /** A fibra de entrada do splitter é cortada na CEO? (no desbalanceado só se a passagem sair por outro cabo) */
 function splitterCutsInput(sp) {
   if (!isUnbalancedSplitter(sp.splitter)) return true;
-  return Object.values(sp.fusions || {}).some(fus => Object.values(fus).includes('S2'));
+  return Object.values(liveFusions(sp)).some(fus => Object.values(fus).includes('S2'));
 }
 
 function splitterName(splitter) {
@@ -544,10 +544,28 @@ function countActiveFibersAt(cable, latlng) {
  * em cada uma: fusionadas para um cabo derivado (sangria) ou ligadas na entrada do splitter.
  * Não cortam a fibra: a CTO e o splitter desbalanceado com a passagem seguindo no cabo.
  */
+/** Fusões da CEO só dos cabos que saem dela hoje (ignora cabo apagado ou religado em outro lugar) */
+function liveFusions(sp) {
+  const out = {};
+  Object.entries(sp.fusions || {}).forEach(([cid, fus]) => {
+    if (STATE.cables.some(c => c.id === cid && c.sourceType === 'splice' && c.sourceId === sp.id)) out[cid] = fus;
+  });
+  return out;
+}
+
+/** Apaga das CEOs as fusões de cabos que não saem mais delas */
+function pruneStaleFusions() {
+  STATE.splices.forEach(sp => {
+    if (!sp.fusions) return;
+    const live = liveFusions(sp);
+    Object.keys(sp.fusions).forEach(cid => { if (!live[cid]) delete sp.fusions[cid]; });
+  });
+}
+
 function getSpliceUsesAlong(cable) {
   return STATE.splices.filter(s => s.cableId === cable.id).map(sp => {
     const fibers = new Set();
-    Object.values(sp.fusions || {}).forEach(fus => Object.values(fus).forEach(src => {
+    Object.values(liveFusions(sp)).forEach(fus => Object.values(fus).forEach(src => {
       if (!isSplitterOutput(src)) fibers.add(parseInt(src));
     }));
     // Fibra que entra num splitter desbalanceado e segue pela passagem: usada aqui, mas não cortada
@@ -597,6 +615,7 @@ function getCtoSignal(cto) {
  */
 function recomputeSignals() {
   repairSpliceInputs();
+  pruneStaleFusions();
 
   STATE.cables.forEach(c => {
     if (!c.fiberMapping) c.fiberMapping = {};
