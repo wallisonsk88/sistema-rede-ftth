@@ -121,6 +121,9 @@ async function deleteProject(event, id) {
     batch.delete(userProjectsRef(currentUser.uid).doc(id));
     batch.delete(userProjectDataRef(currentUser.uid).doc(id));
     await batch.commit();
+    // Fotos do projeto (POP, CEO, CTO, rompimentos) também saem da nuvem
+    const photos = await fbDB.collection('users').doc(currentUser.uid).collection('photos').where('projectId', '==', id).get();
+    await Promise.all(photos.docs.map(d => d.ref.delete()));
     localStorage.removeItem(LEGACY_PROJECT_PREFIX + id);
   } catch (e) {
     console.error(e);

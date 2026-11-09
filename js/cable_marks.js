@@ -120,7 +120,7 @@ async function removeCableMark(id) {
   renderPanel();
   toast(found.kind === 'reserve' ? '🗑️ Reserva técnica removida' : '🗑️ Emenda de rompimento removida');
   if (typeof getPhotos === 'function') {
-    try { for (const p of await getPhotos(id)) await deletePhoto(p.id); } catch (e) { console.warn('Fotos da emenda não apagadas:', e); }
+    try { for (const p of [...await getPhotos(id)]) await deletePhoto(p.id); } catch (e) { console.warn('Fotos da emenda não apagadas:', e); }
   }
 }
 

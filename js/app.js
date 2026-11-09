@@ -53,6 +53,8 @@ async function init() {
   renderPanel();
   if (typeof renderAllCTOMarkers === 'function') renderAllCTOMarkers();
   if (typeof renderAllSplices === 'function') renderAllSplices();
+  // Fotos antigas que ficaram só neste aparelho sobem para a nuvem (em segundo plano)
+  if (typeof migrateLocalPhotosToCloud === 'function') migrateLocalPhotosToCloud().catch(e => console.error(e));
 }
 
 window.onload = init;

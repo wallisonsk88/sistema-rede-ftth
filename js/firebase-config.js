@@ -4,6 +4,7 @@
  * Estrutura no Firestore (cada usuário só acessa os próprios dados):
  *   users/{uid}/projects/{projectId}     -> { name, updatedAt }        (lista do dashboard)
  *   users/{uid}/projectData/{projectId}  -> { json, updatedAt }        (conteúdo do projeto)
+ *   users/{uid}/photos/{photoId}         -> { projectId, elementId, data, caption, date } (fotos)
  *
  * O conteúdo é salvo como string JSON porque o Firestore não aceita arrays
  * aninhados (ex.: path do cabo = [[lat, lng], ...]).
