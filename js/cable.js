@@ -232,7 +232,9 @@ function cableTooltipHtml(cable) {
   return `
     <div style="text-align: center;">
       <b>${cable.name || 'Cabo'}</b><br>
-      <span style="color: var(--primary);">🧵 ${cable.fibers} FO</span> | 📏 ${formatDist(calcPolylineLength(cable.path || []))}
+      <span style="color: var(--primary);">🧵 ${cable.fibers} FO</span> | 📏 ${formatDist(cableTotalLength(cable))}
+      ${cableReserveMeters(cable) ? `<br><span style="font-size:10px;">🌀 inclui ${formatDist(cableReserveMeters(cable))} de reserva técnica</span>` : ''}
+      ${(cable.breaks || []).length ? `<br><span style="font-size:10px; color:#f59e0b;">⚡ ${cable.breaks.length} rompimento(s) registrado(s)</span>` : ''}
       ${[...routes].map(r => `<br><span style="font-size:10px;">${r}</span>`).join('')}
     </div>
   `;
@@ -271,12 +273,13 @@ function renderCableOnMap(cableObj) {
     }
   });
 
-  // Botão direito no cabo para entrar no modo de edição (se já estiver editando, não faz nada para permitir que o Geoman use o botão direito para deletar o vértice)
+  // Botão direito no cabo abre o menu (reserva técnica, emenda de rompimento, ajuste fino).
+  // Se já estiver editando, não faz nada para permitir que o Geoman use o botão direito para deletar o vértice
   pl.on('contextmenu', ev => {
     if (STATE.tool !== 'eraser') {
        if (isGeomanEditingCableId !== cableObj.id) {
            L.DomEvent.stopPropagation(ev);
-           toggleGeomanEditCable(cableObj.id);
+           openCableContextMenu(cableObj.id, ev.latlng);
        }
     }
   });
@@ -362,6 +365,7 @@ function removeCable(id) {
 
   if (cable.layer) map.removeLayer(cable.layer);
   STATE.cables.splice(cIndex, 1);
+  renderAllCableMarks();
 
   if (STATE.selectedId === id) STATE.selectedId = null;
 

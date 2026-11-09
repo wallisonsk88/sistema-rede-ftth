@@ -93,6 +93,8 @@ function serializeState() {
       path: c.path,
       fibers: c.fibers,
       fiberMapping: c.fiberMapping,
+      reserves: c.reserves || [],
+      breaks: c.breaks || [],
     })),
     splices: STATE.splices.map(s => ({
       id: s.id,
@@ -145,6 +147,7 @@ function applyDataToState(data) {
     STATE.cables.push(c);
     if (typeof renderCableOnMap === 'function') renderCableOnMap(c);
   });
+  if (typeof renderAllCableMarks === 'function') renderAllCableMarks();
 
   // Centraliza o mapa no projeto carregado automaticamente
   setTimeout(() => {
@@ -229,6 +232,7 @@ function clearAll(silent = false) {
   STATE.cables.forEach(c => { if (c.layer) map.removeLayer(c.layer); });
   if (typeof ctoMarkersLayer !== 'undefined') ctoMarkersLayer.clearLayers();
   if (typeof spliceMarkersLayer !== 'undefined') spliceMarkersLayer.clearLayers();
+  if (typeof cableMarksLayer !== 'undefined') cableMarksLayer.clearLayers();
 
   STATE.olts = [];
   STATE.cables = [];

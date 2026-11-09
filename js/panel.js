@@ -73,6 +73,9 @@ function renderProps() {
   const cable = STATE.cables.find(c => c.id === id);
   if (cable) return renderCableProps(cable);
 
+  const cableMark = typeof findCableMark === 'function' ? findCableMark(id) : null;
+  if (cableMark) return renderCableMarkProps(cableMark);
+
   const splice = STATE.splices.find(s => s.id === id);
   if (splice) return renderSpliceProps(splice);
 
@@ -115,6 +118,7 @@ function handleElementClick(id, latlng) {
 function selectElement(id) {
   STATE.selectedId = id;
   renderPanel();
+  if (typeof renderAllCableMarks === 'function') renderAllCableMarks(); // destaca a reserva/emenda selecionada
 }
 
 /** Deleta um elemento do mapa e do estado */
@@ -198,6 +202,10 @@ function renderCableProps(cable) {
         ${[2, 4, 6, 12, 24, 36, 48, 72, 144].map(v => `<option value="${v}" ${cable.fibers === v ? 'selected' : ''}>${v} Fibras (FO)</option>`).join('')}
       </select>
     </div>
+
+    <hr style="border:0; border-top:1px dashed var(--border); margin:15px 0;">
+    <h3 style="margin-bottom:10px; font-size:12px; color:var(--text); text-transform:uppercase;">Tamanho, Reservas e Rompimentos</h3>
+    ${renderCableMarksSection(cable)}
 
     <hr style="border:0; border-top:1px dashed var(--border); margin:15px 0;">
     <h3 style="margin-bottom:10px; font-size:12px; color:var(--text); text-transform:uppercase;">Alocação de Fibras</h3>

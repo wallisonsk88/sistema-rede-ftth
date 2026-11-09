@@ -6,6 +6,8 @@ function generateReportData(selectedOltId = '') {
   let totalCTOs = 0;
   let cableLengths = {}; // ex: { '6': 150.5, '12': 320.0 }
   let totalCable = 0;
+  let totalReserve = 0; // metros de reserva técnica (já entram no totalCable)
+  let totalBreaks = 0;
 
   // Mapeia PONs para suas OLTs
   const ponToOltMap = {};
@@ -61,7 +63,9 @@ function generateReportData(selectedOltId = '') {
     if (selectedOltId && !allowedCables.has(cable.id)) return;
     if (!cable.path || cable.path.length < 2) return;
 
-    const lengthMeters = calcPolylineLength(cable.path);
+    const lengthMeters = cableTotalLength(cable); // traçado + reservas técnicas
+    totalReserve += cableReserveMeters(cable);
+    totalBreaks += (cable.breaks || []).length;
 
     const fo = cable.fibers || 0;
     if (!cableLengths[fo]) cableLengths[fo] = 0;
@@ -73,7 +77,9 @@ function generateReportData(selectedOltId = '') {
     totalCTOs,
     totalCEOs,
     cableLengths,
-    totalCable
+    totalCable,
+    totalReserve,
+    totalBreaks
   };
 }
 
@@ -146,6 +152,11 @@ window.openReportModal = function(selectedOltId = '') {
           </div>
           <div style="font-size:16px; font-weight:800; color:var(--green);">${data.totalCable.toFixed(1)} <span style="font-size:12px; font-weight:600; color:var(--text3);">metros</span></div>
         </div>
+        ${data.totalReserve || data.totalBreaks ? `
+        <div style="padding:10px 16px; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:12px; color:var(--text2); border-top:1px solid rgba(255,255,255,0.05);">
+          <span>🌀 Reservas técnicas (já somadas acima): <b style="color:var(--text);">${data.totalReserve.toFixed(1)} m</b></span>
+          <span>⚡ Rompimentos registrados: <b style="color:var(--text);">${data.totalBreaks}</b></span>
+        </div>` : ''}
     `;
   } else {
     html += `
@@ -187,6 +198,8 @@ function copyReport() {
     text += `- Cabo ${fo} FO: ${data.cableLengths[fo].toFixed(1)} metros\n`;
   });
   text += `Total Geral de Cabos: ${data.totalCable.toFixed(1)} metros\n`;
+  if (data.totalReserve) text += `(inclui ${data.totalReserve.toFixed(1)} metros de reserva técnica)\n`;
+  if (data.totalBreaks) text += `Rompimentos registrados: ${data.totalBreaks}\n`;
   text += `----------------------------------------\n`;
   text += `* Lembre-se de adicionar margem de segurança (sobras) para a compra.\n`;
 

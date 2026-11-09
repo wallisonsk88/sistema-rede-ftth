@@ -117,6 +117,24 @@ Observações: ${cto.obs || 'Nenhuma'}
   });
   kmlParts.push(`</Folder>`);
 
+  // Reservas técnicas e emendas de rompimento
+  kmlParts.push(`<Folder><name>Reservas e Rompimentos</name>`);
+  STATE.cables.forEach(cable => {
+     (cable.reserves || []).forEach(r => kmlParts.push(`
+       <Placemark>
+         <name><![CDATA[Reserva ${Math.round(r.meters || 0)} m]]></name>
+         <description><![CDATA[Cabo: ${cable.name}${r.obs ? '\n' + r.obs : ''}]]></description>
+         <Point><coordinates>${r.lng},${r.lat},0</coordinates></Point>
+       </Placemark>`));
+     (cable.breaks || []).forEach(b => kmlParts.push(`
+       <Placemark>
+         <name><![CDATA[Rompimento ${b.date ? b.date.split('-').reverse().join('/') : ''}]]></name>
+         <description><![CDATA[Cabo: ${cable.name}${b.cause ? '\nCausa: ' + b.cause : ''}${b.description ? '\n' + b.description : ''}]]></description>
+         <Point><coordinates>${b.lng},${b.lat},0</coordinates></Point>
+       </Placemark>`));
+  });
+  kmlParts.push(`</Folder>`);
+
   kmlParts.push(`</Document>`);
   kmlParts.push(`</kml>`);
 
