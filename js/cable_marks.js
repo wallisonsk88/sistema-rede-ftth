@@ -227,7 +227,7 @@ function renderCableMarksSection(cable) {
   const traced = calcPolylineLength(cable.path || []);
   const reserves = cable.reserves || [];
   const breaks = cable.breaks || [];
-  const at = STATE.clickedLatLng;
+  const at = cableClickPoint(cable);
   const row = (m, icon, text) => `
     <div class="mark-row" onclick="goToCableMark('${m.id}')">
       <span>${icon}</span><span style="flex:1;">${text}</span><span style="color:var(--text3);">›</span>

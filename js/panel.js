@@ -110,7 +110,21 @@ function handleElementClick(id, latlng) {
     deleteElement(id);
     return;
   }
-  if (latlng) STATE.clickedLatLng = latlng;
+  // O ponto clicado vale só para o elemento em que se clicou
+  STATE.clickedLatLng = latlng || null;
+  STATE.clickedOnId = latlng ? id : null;
+  selectElement(id);
+}
+
+/** Ponto do cabo onde o usuário clicou (null se o cabo foi aberto de outro jeito) */
+function cableClickPoint(cable) {
+  return STATE.clickedLatLng && STATE.clickedOnId === cable.id ? STATE.clickedLatLng : null;
+}
+
+/** Volta a ver as fibras do cabo a partir da origem (sem ponto clicado) */
+function viewCableFromOrigin(id) {
+  STATE.clickedLatLng = null;
+  STATE.clickedOnId = null;
   selectElement(id);
 }
 
@@ -215,8 +229,9 @@ function renderCableProps(cable) {
 
   // Calculate click distance
   let clickDist = 0;
-  if (STATE.clickedLatLng) {
-    clickDist = getDistanceAlongCable(STATE.clickedLatLng, cable.path);
+  const clickPoint = cableClickPoint(cable);
+  if (clickPoint) {
+    clickDist = getDistanceAlongCable(clickPoint, cable.path);
   }
 
   // Mapeia onde cada ramal está sendo usado em OUTROS cabos tronco
@@ -232,6 +247,16 @@ function renderCableProps(cable) {
   });
 
   const cuts = getFiberCuts(cable);
+  const deadHere = Object.keys(cuts).filter(f => parseInt(f) <= cable.fibers && clickDist > cuts[f].dist + 1);
+  if (deadHere.length) {
+    const ceos = [...new Set(deadHere.map(f => cuts[f].splice.name))].join(', ');
+    html += `
+      <div style="font-size:11px; color:var(--text2); background:var(--surface2); border:1px dashed var(--border); border-radius:6px; padding:8px; margin-bottom:4px;">
+        📍 Fibras vistas no ponto onde você clicou (${formatDist(clickDist)} da origem do cabo).
+        As marcadas como cortadas foram fundidas na ${ceos}, antes deste ponto.
+        <button class="btn-full" style="margin-top:6px;" onclick="viewCableFromOrigin('${cable.id}')">Ver fibras desde a origem do cabo</button>
+      </div>`;
+  }
   const isRoot = isRootCable(cable);
   const sourceSplice = isRoot ? null : STATE.splices.find(s => s.id === cable.sourceId);
   const sourceCable = sourceSplice ? STATE.cables.find(c => c.id === sourceSplice.cableId) : null;
