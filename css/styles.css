@@ -339,6 +339,9 @@ path.leaflet-interactive:focus {
 .fp-input:focus, .fp-select:focus { border-color: var(--primary); background: rgba(249,115,22,0.05); }
 .fp-select { cursor: pointer; }
 .fp-select option { background: #1a2235; }
+/* Título de grupo (nome do cabo) dentro das listas: fundo escuro, texto laranja */
+select optgroup { background: #0f1625; color: #f97316; font-weight: 700; font-style: normal; }
+select optgroup option { color: var(--text); font-weight: 400; }
 .fp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
 /* Campos do painel do cabo (mesmo visual dos fp-*) */
