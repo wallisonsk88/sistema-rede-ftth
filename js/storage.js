@@ -12,6 +12,8 @@ let cloudSaveInFlight = false;
 let pendingStateJson = null;
 window.STATE_HISTORY = [];
 window.isUndoing = false;
+let lockBaseJson = null;   // último estado aceito (base do modo visualização)
+let lastCloudJson = null;  // último estado gravado na nuvem (base do histórico de alterações)
 
 /** Atualiza o indicador de sincronização na barra de status */
 function setSyncStatus(status) {
@@ -35,12 +37,22 @@ async function flushCloudSave() {
   const updatedAt = new Date().toISOString();
   const name = document.getElementById('projectName').value;
 
+  // Histórico: o que mudou desde a última gravação
+  let logEntry = null;
+  try {
+    if (lastCloudJson && typeof describeChanges === 'function') {
+      logEntry = buildLogEntry(describeChanges(JSON.parse(lastCloudJson), JSON.parse(json)));
+    }
+  } catch (e) { console.warn('Histórico: falha ao comparar', e); }
+
   cloudSaveInFlight = true;
   try {
     const batch = fbDB.batch();
     batch.set(userProjectDataRef(currentUser.uid).doc(currentProjectId), { json, updatedAt });
     batch.set(userProjectsRef(currentUser.uid).doc(currentProjectId), { name, updatedAt });
+    if (logEntry) batch.set(projectLogRef().doc(), logEntry);
     await batch.commit();
+    lastCloudJson = json;
     if (!pendingStateJson) setSyncStatus('saved');
   } catch (e) {
     console.error('Erro ao salvar na nuvem:', e);
@@ -115,6 +127,14 @@ function saveLocal() {
 
   const currentStateJson = JSON.stringify(data);
 
+  // Modo visualização: nada pode mudar. Se mudou, volta ao último estado aceito.
+  if (window.lockReverting) return;
+  if (projectLoaded && STATE.locked && lockBaseJson !== null && currentStateJson !== lockBaseJson) {
+    if (typeof revertLockedState === 'function') revertLockedState(lockBaseJson);
+    return;
+  }
+  lockBaseJson = currentStateJson;
+
   // Histórico de Desfazer (Undo)
   if (!window.isUndoing) {
     if (window.STATE_HISTORY.length === 0 || window.STATE_HISTORY[window.STATE_HISTORY.length - 1] !== currentStateJson) {
@@ -133,7 +153,7 @@ function saveLocal() {
 }
 
 /** Aplica um objeto de dados JSON ao Estado (STATE) */
-function applyDataToState(data) {
+function applyDataToState(data, opts = {}) {
   document.getElementById('projectName').value = data.projectName || 'Meu Projeto de Rede';
   STATE.nextOLTNum = data.nextOLTNum || 1;
   STATE.splices = data.splices || [];
@@ -150,7 +170,7 @@ function applyDataToState(data) {
   if (typeof renderAllCableMarks === 'function') renderAllCableMarks();
 
   // Centraliza o mapa no projeto carregado automaticamente
-  setTimeout(() => {
+  if (!opts.keepView) setTimeout(() => {
     if (typeof fitBounds === 'function') fitBounds();
   }, 500);
 }
@@ -173,6 +193,7 @@ async function loadFromCloud() {
     }
     applyDataToState(JSON.parse(doc.data().json));
     saveLocal(); // registra o estado inicial no histórico de desfazer (ainda sem gravar na nuvem)
+    lastCloudJson = lockBaseJson;
     projectLoaded = true;
     setSyncStatus('saved');
   } catch (e) {

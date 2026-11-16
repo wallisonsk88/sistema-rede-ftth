@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="css/styles.css?v=18">
+  <link rel="stylesheet" href="css/styles.css?v=19">
 </head>
 <body>
 
@@ -32,11 +32,14 @@
     <input class="project-name-input" id="projectName" value="Meu Projeto de Rede" title="Clique para renomear">
     <div class="topbar-spacer"></div>
 
-    <button class="topbar-btn" onclick="clearAll()" title="Apagar projeto">🗑️ <span class="tb-text">Limpar</span></button>
+    <button class="topbar-btn edit-toggle" id="editModeBtn" onclick="toggleEditMode()">🔒 <span class="tb-text">Visualização</span></button>
+    <button class="topbar-btn" onclick="openChangeLog()" title="Ver o que foi alterado no projeto">📜 <span class="tb-text">Histórico</span></button>
+    <div class="topbar-sep"></div>
+    <button class="topbar-btn edit-only" onclick="clearAll()" title="Apagar projeto">🗑️ <span class="tb-text">Limpar</span></button>
     <button class="topbar-btn" onclick="exportProject()" title="Salvar projeto em arquivo JSON">💾 <span class="tb-text">Salvar</span></button>
     <button class="topbar-btn" onclick="exportKMZ()" title="Exportar para Google Earth" style="color: #4ade80;">🌍 <span class="tb-text">KMZ</span></button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProject(event)">
-    <button class="topbar-btn" onclick="document.getElementById('importFile').click()" title="Abrir projeto">📂 <span class="tb-text">Abrir</span></button>
+    <button class="topbar-btn edit-only" onclick="if (STATE.locked) lockedToast(); else document.getElementById('importFile').click()" title="Abrir projeto">📂 <span class="tb-text">Abrir</span></button>
     <div class="topbar-sep"></div>
     <button class="topbar-btn" onclick="openReportModal()" style="background:var(--primary); color:white; border-color:var(--primary);">📊 <span class="tb-text">Relatório</span></button>
     <button class="mobile-hamburger-btn" onclick="toggleMobilePanel()">☰</button>
@@ -53,15 +56,15 @@
 
       <div class="tool-group-sep"></div>
 
-      <button class="tool-btn" id="tool-pop" onclick="setTool('pop')" data-tip="Colocar POP / OLT (O)">
+      <button class="tool-btn edit-only" id="tool-pop" onclick="setTool('pop')" data-tip="Colocar POP / OLT (O)">
         <div class="ti">🏢</div><div class="tl">POP</div>
       </button>
 
-      <button class="tool-btn" id="tool-cable" onclick="setTool('cable')" data-tip="Lançar Cabo (C)">
+      <button class="tool-btn edit-only" id="tool-cable" onclick="setTool('cable')" data-tip="Lançar Cabo (C)">
         <div class="ti">〰️</div><div class="tl">CABO</div>
       </button>
 
-      <button class="tool-btn" id="tool-splice" onclick="setTool('splice')" data-tip="Caixa de Emenda (E)">
+      <button class="tool-btn edit-only" id="tool-splice" onclick="setTool('splice')" data-tip="Caixa de Emenda (E)">
         <div class="ti"><img src="img/ceo.svg" style="width:22px; height:22px; display:block; margin:auto;" alt="CEO"></div><div class="tl">CEO</div>
       </button>
 
@@ -71,13 +74,13 @@
         <div class="ti">📏</div><div class="tl">RÉGUA</div>
       </button>
 
-      <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')" data-tip="Apagar elemento (Del)">
+      <button class="tool-btn edit-only" id="tool-eraser" onclick="setTool('eraser')" data-tip="Apagar elemento (Del)">
         <div class="ti">🗑️</div><div class="tl">DEL</div>
       </button>
 
       <div class="tool-group-sep"></div>
 
-      <button class="tool-btn" onclick="undoLastAction()" data-tip="Desfazer (Ctrl+Z)">
+      <button class="tool-btn edit-only" onclick="undoLastAction()" data-tip="Desfazer (Ctrl+Z)">
         <div class="ti">↩️</div><div class="tl">VOLTAR</div>
       </button>
 
@@ -117,6 +120,7 @@
   <footer class="statusbar">
     <span>🛠️ Ferramenta: <strong id="sb-tool">Selecionar</strong></span>
     <span>🏢 POPs: <strong id="sb-pops">0</strong></span>
+    <span id="sb-mode"></span>
     <span id="sb-sync" style="margin-left:auto;"></span>
   </footer>
 
@@ -134,6 +138,20 @@
       <div class="report-modal-footer">
         <button class="btn-full" style="width:auto; margin:0;" onclick="copyReport()">Copiar para Área de Transferência</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL HISTÓRICO -->
+  <div id="logModal" class="report-modal-overlay" style="display:none;" onclick="if (event.target === this) closeChangeLog()">
+    <div class="report-modal log-modal">
+      <div class="report-modal-header">
+        <h3>📜 Histórico de alterações</h3>
+        <button onclick="closeChangeLog()">✕</button>
+      </div>
+      <div style="padding:10px 16px 0;">
+        <input id="logSearch" class="fp-input" placeholder="🔎 Filtrar (ex.: CTO 03, fusão, nome da pessoa)" oninput="renderChangeLog()">
+      </div>
+      <div class="report-modal-body" id="logContent"></div>
     </div>
   </div>
 
@@ -164,12 +182,14 @@
   <script src="js/splice.js?v=55"></script>
   <script src="js/cto.js?v=61"></script>
   <script src="js/ruler.js?v=55"></script>
-  <script src="js/photos.js?v=56"></script>
+  <script src="js/photos.js?v=57"></script>
   <script src="js/panel.js?v=72"></script>
   <script src="js/rack.js?v=4"></script>
-  <script src="js/storage.js?v=67"></script>
+  <script src="js/storage.js?v=68"></script>
   <script src="js/kml_export.js?v=56"></script>
   <script src="js/report.js?v=62"></script>
-  <script src="js/app.js?v=57"></script>
+  <script src="js/changelog.js?v=1"></script>
+  <script src="js/editmode.js?v=1"></script>
+  <script src="js/app.js?v=58"></script>
 </body>
 </html>

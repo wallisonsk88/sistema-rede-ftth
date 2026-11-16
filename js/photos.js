@@ -36,6 +36,7 @@ async function addPhoto(elementId, base64Data, caption) {
     date: new Date().toISOString()
   };
   (photoCache[elementId] = photoCache[elementId] || []).push({ id: ref.id, ...record });
+  if (typeof logChanges === 'function') logChanges([{ t: `📸 Foto adicionada em ${photoElementLabel(elementId)}`, id: elementId }]);
   // Não espera o servidor: sem internet a foto fica no cache e sobe quando a conexão voltar
   ref.set(record).catch(e => {
     console.error('Erro ao enviar foto para a nuvem:', e);
@@ -65,11 +66,27 @@ function getPhotos(elementId) {
 
 /** Remove uma foto pelo ID */
 async function deletePhoto(photoId) {
-  Object.values(photoCache).forEach(list => {
+  let elementId = null;
+  Object.entries(photoCache).forEach(([el, list]) => {
     const i = list.findIndex(p => p.id === photoId);
-    if (i >= 0) list.splice(i, 1);
+    if (i >= 0) { list.splice(i, 1); elementId = el; }
   });
+  if (typeof logChanges === 'function') logChanges([{ t: `🗑️ Foto apagada${elementId ? ' de ' + photoElementLabel(elementId) : ''}`, id: elementId || undefined }]);
   await cloudPhotosRef().doc(photoId).delete();
+}
+
+/** Nome do elemento dono da foto, para o histórico */
+function photoElementLabel(id) {
+  const pop = STATE.olts.find(o => o.id === id);
+  if (pop) return `POP "${pop.name}"`;
+  const sp = STATE.splices.find(s => s.id === id);
+  if (sp) return `CEO "${sp.name}"`;
+  let cto = null;
+  STATE.olts.forEach(p => (p.pons || []).forEach(pon => (pon.ramais || []).forEach(r => (r.ctos || []).forEach(c => { if (c.id === id) cto = c; }))));
+  if (cto) return `CTO "${cto.name}"`;
+  const mark = typeof findCableMark === 'function' ? findCableMark(id) : null;
+  if (mark) return `rompimento no cabo "${mark.cable.name}"`;
+  return 'elemento';
 }
 
 /** Acha uma foto já carregada (ou busca na nuvem) */

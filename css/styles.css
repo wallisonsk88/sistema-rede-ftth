@@ -1194,3 +1194,22 @@ svg:focus, path:focus, .leaflet-interactive:focus { outline: none !important; }
 .mark-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; cursor: pointer; }
 .mark-row:hover { border-color: var(--primary); }
 .mark-row b { color: var(--text); }
+
+/* ===== Modo edição (cadeado) ===== */
+.edit-toggle { background: #334155; color: #e2e8f0; border-color: #475569; font-weight: 700; }
+.edit-toggle.editing { background: #16a34a; color: #fff; border-color: #16a34a; box-shadow: 0 0 0 2px rgba(22,163,74,.35); }
+body.locked .edit-only { opacity: .35; }
+body.locked .locked-action { opacity: .45; cursor: not-allowed !important; }
+body.locked #panelBody input:disabled, body.locked #panelBody select:disabled, body.locked #panelBody textarea:disabled { opacity: .8; cursor: not-allowed; }
+body.locked .project-name-input { cursor: default; }
+
+/* ===== Histórico de alterações ===== */
+.log-modal { max-width: 760px; width: 94vw; }
+.log-day { font-size: 11px; font-weight: 700; color: var(--primary); text-transform: capitalize; margin: 14px 0 6px; }
+.log-entry { background: var(--surface2, #1a2235); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.log-head { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.log-head b { color: var(--text); }
+.log-item { font-size: 12px; color: var(--text); padding: 3px 0; border-top: 1px dashed rgba(255,255,255,.06); }
+.log-item.link { cursor: pointer; }
+.log-item.link:hover { color: var(--primary); }
+.log-empty { text-align: center; color: var(--text2); padding: 30px 10px; font-size: 13px; }
